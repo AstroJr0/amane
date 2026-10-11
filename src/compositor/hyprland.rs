@@ -7,6 +7,21 @@ use serde_json::Value;
 
 use crate::Workspace;
 
+// Checks if Hyprland is in lua mode
+pub fn is_hyprland_lua_mode() -> bool {
+    // idea: take output from 'configProvider'
+    // by running `hyprctl status`
+    if let Ok(output) = Command::new("hyprctl").arg("status").output() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        for line in stdout.lines() {
+            if line.trim().starts_with("configProvider:") {
+                return line.contains("lua");
+            }
+        }
+    }
+}
+
+
 // hyprland keeps its sockets in a folder named after the running instance
 fn socket(name: &str) -> Option<PathBuf> {
     let runtime = env::var_os("XDG_RUNTIME_DIR")?;
@@ -40,19 +55,14 @@ pub fn focus_workspace(id: i64) {
         return;
     };
 
-    let reply = request(&format!("dispatch workspace {target}"));
-
-    if reply.as_deref() == Some("ok") {
-        return;
+    // Hyprland is running in Lua mode? (for version >= 0.56)
+    if is_hyprland_lua_mode() {
+        let _ = request(&format!("dispatch hl.dsp.focus({{ workspace = {target:?} }})"));
+    } else {
+        let reply = request(&format!("dispatch workspace {target}"));
     }
-
-    /*
-     * since 0.56 a lua config reads dispatch as lua, so the line above
-     * only gets a syntax error back; {:?} quotes the target as a string
-     * with escapes lua reads the same way
-     */
-    let _ = request(&format!("dispatch hl.dsp.focus({{ workspace = {target:?} }})"));
 }
+
 
 // what both dispatch forms accept, a number or name:<name>
 fn target_of(id: i64) -> Option<String> {
