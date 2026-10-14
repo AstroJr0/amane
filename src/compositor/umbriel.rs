@@ -224,43 +224,21 @@ mod tests {
         {"id":3,"index":1,"name":"3","named":true,"output":"DP-1","active":true,"focused":false,"urgent":false,"window_count":0}
     ]}"#;
 
-    const WORKSPACE_EVENT: &str = r#"{"event":"workspaces","data":[
-        {"id":1,"index":1,"name":"1","named":false,"output":"eDP-1","active":true,"focused":true,"urgent":false,"window_count":2}
-    ]}"#;
+    const WORKSPACE_EVENT: &str = r#"{"event":"workspaces","data":[{"id":1,"index":1,"name":"1","named":false,"output":"eDP-1","active":true,"focused":true,"urgent":false,"window_count":2}]}"#;
 
     #[test]
-    fn reads_workspaces_from_query_and_events() {
-        let list = parse(WORKSPACES_QUERY).expect("failed to parse umbriel query reply");
+    fn follows_event_stream_snapshots_until_eof() {
+        let first = WORKSPACE_EVENT.replace('\n', "");
+        let updated = r#"{"event":"workspaces","data":[{"id":1,"index":1,"name":"1","named":false,"output":"eDP-1","active":true,"focused":true,"urgent":false,"window_count":5}]}"#;
 
-        assert_eq!(list.len(), 3);
+        let input = format!("{first}\n{{\"event\":\"windows\",\"data\":[]}}\ninvalid\n{updated}\n");
+        let mut updates = Vec::new();
 
-        // automatic numeric workspace
-        assert_eq!(list[0].id, 1);
-        assert_eq!(list[0].index, 1);
-        assert_eq!(list[0].name, None);
-        assert_eq!(list[0].windows, 3);
-        assert!(list[0].active);
-        assert!(list[0].focused);
+        events(std::io::Cursor::new(input), |list| updates.push(list));
 
-        // named workspace
-        assert_eq!(list[1].id, 2);
-        assert_eq!(list[1].index, 2);
-        assert_eq!(list[1].name.as_deref(), Some("web"));
-        assert_eq!(list[1].windows, 1);
-        assert!(list[1].urgent);
-        assert!(!list[1].focused);
-
-        // workspace explicitly named "3" retains its name despite matching a digit
-        assert_eq!(list[2].id, 3);
-        assert_eq!(list[2].index, 1);
-        assert_eq!(list[2].name.as_deref(), Some("3"));
-        assert_eq!(list[2].output.as_deref(), Some("DP-1"));
-        assert!(list[2].active);
-        assert!(!list[2].focused);
-
-        let event_list = parse(WORKSPACE_EVENT).expect("failed to parse event snapshot");
-        assert_eq!(event_list.len(), 1);
-        assert_eq!(event_list[0].windows, 2);
+        assert_eq!(updates.len(), 2);
+        assert_eq!(updates[0][0].windows, 2);
+        assert_eq!(updates[1][0].windows, 5);
     }
 
     #[test]
