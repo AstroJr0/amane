@@ -2,6 +2,7 @@ mod hyprland;
 mod mango;
 mod niri;
 mod sway;
+mod umbriel;
 
 use std::env;
 
@@ -12,6 +13,7 @@ enum Compositor {
     Hyprland,
     Sway,
     Mango,
+    Umbriel,
 }
 
 // each compositor sets its own variable for the programs it starts
