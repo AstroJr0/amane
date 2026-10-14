@@ -193,10 +193,12 @@ mod tests {
         assert_eq!(list[1].name.as_deref(), Some("web"));
     }
 
-    #[test]
+        #[test]
     fn follows_event_stream_snapshots_until_eof() {
         let updated = r#"{"event":"workspaces","data":[{"id":1,"index":1,"name":"1","named":false,"output":"eDP-1","active":true,"focused":true,"urgent":false,"window_count":5}]}"#;
-        let input = format!("{WORKSPACE_EVENT}\n{\"event\":\"windows\",\"data\":[]}\ninvalid\n{updated}\n");
+        let input = format!(
+            "{WORKSPACE_EVENT}\n{{\"event\":\"windows\",\"data\":[]}}\ninvalid\n{updated}\n"
+        );
         
         let mut updates = Vec::new();
         let reader = std::io::Cursor::new(input);
@@ -211,4 +213,5 @@ mod tests {
         assert_eq!(updates[0][0].windows, 2);
         assert_eq!(updates[1][0].windows, 5);
     }
+
 }
