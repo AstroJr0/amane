@@ -45,13 +45,9 @@ pub fn focus_workspace(id: i64) {
 }
 
 fn focus(id: i64, mut query: impl FnMut(&str) -> Option<String>) -> Option<()> {
-    let reply = query(r#"{"cmd":"workspaces"}"#)?;
-    let list = parse(&reply)?;
-    let target = focus_target(id, &list)?;
-
     let request = json!({
         "cmd": "msg",
-        "arg": format!("workspace-switch:{target}")
+        "arg": format!("workspace-switch:{id}")
     });
 
     let reply = query(&request.to_string())?;
@@ -64,39 +60,11 @@ fn focus(id: i64, mut query: impl FnMut(&str) -> Option<String>) -> Option<()> {
     Some(())
 }
 
-fn focus_target(id: i64, list: &[Workspace]) -> Option<String> {
-    let workspace = list.iter().find(|ws| ws.id == id)?;
-
-    // bare digits select a position; quotes force a name so numeric names like "2" work
-    let target = match &workspace.name {
-        Some(name) => {
-            if name.contains(['\n', '\r']) {
-                return None;
-            }
-
-            format!("\"{}\"", name.replace('\\', "\\\\").replace('"', "\\\""))
-        }
-        None => workspace.index.to_string(),
-    };
-
-    // umbriel scopes workspace actions to outputs with /output
-    match &workspace.output {
-        Some(output) => {
-            if output.contains(['\n', '\r', '/', ':']) {
-                return None;
-            }
-
-            Some(format!("{target}/{output}"))
-        }
-        None => Some(target),
-    }
-}
-
 /*
  * umbriel emits full workspace snapshots on its event stream, so each
  * event replaces the entire list of workspaces
  */
-pub fn listen(mut on_change: impl FnMut(Vec<Workspace>)) {
+pub fn listen(on_change: impl FnMut(Vec<Workspace>)) {
     let Some(mut stream) = connect() else {
         return;
     };
@@ -222,94 +190,76 @@ mod tests {
         {"id":1,"index":1,"name":"1","named":false,"output":"eDP-1","active":true,"focused":true,"urgent":false,"window_count":3},
         {"id":2,"index":2,"name":"web","named":true,"output":"eDP-1","active":false,"focused":false,"urgent":true,"window_count":1},
         {"id":3,"index":1,"name":"3","named":true,"output":"DP-1","active":true,"focused":false,"urgent":false,"window_count":0}
-    ]}"#;
+        ]}"#;
 
-    const WORKSPACE_EVENT: &str = r#"{"event":"workspaces","data":[{"id":1,"index":1,"name":"1","named":false,"output":"eDP-1","active":true,"focused":true,"urgent":false,"window_count":2}]}"#;
+    const WORKSPACE_EVENT: &str = r#"{"event":"workspaces","data":[
+        {"id":1,"index":1,"name":"1","named":false,"output":"eDP-1","active":true,"focused":true,"urgent":false,"window_count":2}
+        ]}"#;
 
     #[test]
-    fn follows_event_stream_snapshots_until_eof() {
-        let first = WORKSPACE_EVENT.replace('\n', "");
-        let updated = r#"{"event":"workspaces","data":[{"id":1,"index":1,"name":"1","named":false,"output":"eDP-1","active":true,"focused":true,"urgent":false,"window_count":5}]}"#;
+    fn reads_workspaces_from_query_and_events() {
+        let list = parse(WORKSPACES_QUERY).expect("failed to parse umbriel query reply");
 
-        let input = format!("{first}\n{{\"event\":\"windows\",\"data\":[]}}\ninvalid\n{updated}\n");
-        let mut updates = Vec::new();
+        assert_eq!(list.len(), 3);
 
-        events(std::io::Cursor::new(input), |list| updates.push(list));
+        // automatic numeric workspace
+        assert_eq!(list[0].id, 1);
+        assert_eq!(list[0].index, 1);
+        assert_eq!(list[0].name, None);
+        assert_eq!(list[0].windows, 3);
+        assert!(list[0].active);
+        assert!(list[0].focused);
 
-        assert_eq!(updates.len(), 2);
-        assert_eq!(updates[0][0].windows, 2);
-        assert_eq!(updates[1][0].windows, 5);
+        // named workspace
+        assert_eq!(list[1].id, 2);
+        assert_eq!(list[1].index, 2);
+        assert_eq!(list[1].name.as_deref(), Some("web"));
+        assert_eq!(list[1].windows, 1);
+        assert!(list[1].urgent);
+        assert!(!list[1].focused);
+
+        // workspace explicitly named "3" retains its name despite matching a digit
+        assert_eq!(list[2].id, 3);
+        assert_eq!(list[2].index, 1);
+        assert_eq!(list[2].name.as_deref(), Some("3"));
+        assert_eq!(list[2].output.as_deref(), Some("DP-1"));
+        assert!(list[2].active);
+        assert!(!list[2].focused);
+
+        let event_list = parse(WORKSPACE_EVENT).expect("failed to parse event snapshot");
+        assert_eq!(event_list.len(), 1);
+        assert_eq!(event_list[0].windows, 2);
     }
 
     #[test]
-    fn focus_target_formats_proper_selectors() {
-        let list = parse(WORKSPACES_QUERY).unwrap();
-
-        // unnamed workspaces use their 1-based index scoped to their output
-        assert_eq!(
-            focus_target(list[0].id, &list),
-            Some("1/eDP-1".to_string())
-        );
-
-        // named workspaces use quoted strings
-        assert_eq!(
-            focus_target(list[1].id, &list),
-            Some("\"web\"/eDP-1".to_string())
-        );
-
-        // workspaces explicitly named with digits use quotes to avoid position matching
-        assert_eq!(
-            focus_target(list[2].id, &list),
-            Some("\"3\"/DP-1".to_string())
-        );
-
-        assert!(focus_target(999, &list).is_none());
-    }
-
-    #[test]
-    fn escapes_and_rejects_malformed_arguments() {
-        let mut list = parse(WORKSPACES_QUERY).unwrap();
-
-        // quotes and backslashes are escaped
-        list[0].name = Some(r#"foo"bar\baz"#.to_string());
-        assert_eq!(
-            focus_target(list[0].id, &list),
-            Some(r#""foo\"bar\\baz"/eDP-1"#.to_string())
-        );
-
-        // control characters and action delimiters are rejected
-        for output in ["eDP-1/2", "eDP-1:2", "eDP-1\n", "eDP-1\r"] {
-            list[0].output = Some(output.to_string());
-            assert!(focus_target(list[0].id, &list).is_none());
-        }
-
-        list[0].output = Some("eDP-1".to_string());
-        for name in ["foo\nbar", "foo\r"] {
-            list[0].name = Some(name.to_string());
-            assert!(focus_target(list[0].id, &list).is_none());
-        }
-    }
-
-    #[test]
-    fn focuses_workspace_with_switch_action() {
+    fn focuses_workspace_with_switch_action_by_id() {
         let mut commands = Vec::new();
 
-        let result = focus(2, |command| {
+        let result = focus(42, |command| {
             commands.push(command.to_string());
-            if command == r#"{"cmd":"workspaces"}"# {
-                Some(WORKSPACES_QUERY.to_string())
-            } else {
-                Some(r#"{"ok":true}"#.to_string())
-            }
+            Some(r#"{"ok":true}"#.to_string())
         });
 
         assert_eq!(result, Some(()));
         assert_eq!(
             commands,
-            [
-                r#"{"cmd":"workspaces"}"#,
-                r#"{"arg":"workspace-switch:\"web\"/eDP-1","cmd":"msg"}"#,
-            ]
+            [r#"{"arg":"workspace-switch:42","cmd":"msg"}"#]
+        );
+    }
+
+    #[test]
+    fn focus_workspace_handles_errors() {
+        let mut commands = Vec::new();
+
+        let result = focus(99, |command| {
+            commands.push(command.to_string());
+            Some(r#"{"err":"invalid workspace"}"#.to_string())
+        });
+
+        assert_eq!(result, None);
+        assert_eq!(
+            commands,
+            [r#"{"arg":"workspace-switch:99","cmd":"msg"}"#]
         );
     }
 
@@ -317,7 +267,7 @@ mod tests {
     fn follows_event_stream_snapshots_until_eof() {
         let updated = r#"{"event":"workspaces","data":[
             {"id":1,"index":1,"name":"1","named":false,"output":"eDP-1","active":true,"focused":true,"urgent":false,"window_count":5}
-        ]}"#;
+            ]}"#;
 
         let input = format!(
             "{WORKSPACE_EVENT}\n{{\"event\":\"windows\",\"data\":[]}}\ninvalid\n{updated}\n"
