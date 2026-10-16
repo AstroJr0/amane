@@ -10,3 +10,4 @@ path = "src/main.rs"
 
 [dependencies]
 amane = { path = ".." }
+toml_edit = "0.22"
