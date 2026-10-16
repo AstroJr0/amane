@@ -20,7 +20,7 @@
 
 - **Your shell:** `~/.config/amane/src/`, or the folder you gave `amane new` or `amane target`. `main.rs` is the entry point. You can add more files next to it and load them with `mod`, like in any Rust program.
 - **Which folder:** `amane target` prints it. A folder other than the default is saved in `~/.local/state/amane/config-path`, per machine, so it stays out of your dotfiles. Run `amane target` again on each new machine.
-- **Editor support:** `Cargo.toml` next to your `src/`. `amane new` writes it and every build refreshes it, so rust-analyzer finds Amane and completes its types in any editor. Don't edit it. It holds paths for this machine only, so if you keep your shell in git, ignore `Cargo.toml`, `Cargo.lock` and `target/`.
+- **Editor support and dependencies:** `Cargo.toml` next to your `src/`. `amane new` writes it and every build keeps `amane` pointed at the library for this machine, while preserving any extra crates you add. You can commit `Cargo.toml` to your dotfiles repo. If you keep your shell in git, ignore `target/` and optionally `Cargo.lock` unless you want to pin crate versions.
 - **Build files:** `~/.cache/amane/`.
   - `library/` holds the copy of Amane unpacked from the command.
   - `project/` holds the Cargo project generated around your `main.rs`.
@@ -75,12 +75,26 @@ Amane is always optimized, because unoptimized drawing is too slow for smooth an
 
 ## Dependencies
 
-Your shell's `Cargo.toml` is generated for you on every build, and it only depends on `amane`. That means you can't add other crates to your shell yet.
+You can add extra crates from crates.io or local paths to your shell.
 
-Most of what a shell needs is in the library already:
+Add them to `Cargo.toml` next to your `src/`:
 
-- system data, through [Built-in Services](system.md)
-- running commands and reading their output, through [Commands and Files](processes.md)
-- file watching, D-Bus, and IPC
+```toml
+[dependencies]
+amane = { path = "..." }
+chrono = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+```
 
-For anything else, like the current time, run a command with `amane::output` (for example `date +%H:%M`).
+Or run `cargo add` inside your shell folder:
+
+```sh
+cd ~/.config/amane
+cargo add chrono
+```
+
+When you run `amane dev` or `amane compile`:
+- Amane includes all your dependencies in the build.
+- Extra dependencies are automatically optimized (`opt-level = 3`) while your shell code rebuilds fast.
+- Amane keeps its own `amane` dependency pointing to the local library on this machine, so your config remains portable across machines.
+- `amane dev` watches both your `src/` folder and `Cargo.toml`, rebuilding automatically when you save changes.
