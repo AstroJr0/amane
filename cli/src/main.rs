@@ -10,6 +10,7 @@ mod project;
 mod restart;
 mod run;
 mod target;
+mod update;
 mod watch;
 
 use std::env;
@@ -36,6 +37,10 @@ fn main() -> ExitCode {
         ["target"] => target::run(None),
 
         ["target", folder] => target::run(Some(folder)),
+
+        ["update"] => update::run(None),
+
+        ["update", folder] => update::run(Some(folder)),
 
         ["compile"] => compile::run(false),
 
@@ -71,6 +76,7 @@ fn usage() -> ExitCode {
     eprintln!("  amane new [folder]                   create a shell, in ~/.config/amane by default");
     eprintln!("  amane new [folder] --example         create a full example bar instead");
     eprintln!("  amane target [folder]                show or set the folder your shell lives in");
+    eprintln!("  amane update [folder]                pull the repository and rebuild the amane command");
     eprintln!("  amane dev                           rebuild and restart on every save");
     eprintln!("  amane compile                        build the optimised shell");
     eprintln!("  amane compile --restart              build it, then restart the running shell");
