@@ -6,9 +6,9 @@ use std::time::{Duration, SystemTime};
 // a rebuild takes seconds, so checking twice a second is quick enough
 const INTERVAL: Duration = Duration::from_millis(500);
 
-pub fn wait_for_change(folder: &Path, before: Option<SystemTime>) {
+pub fn wait_for_change(config: &Path, before: Option<SystemTime>) {
     loop {
-        if snapshot(folder) != before {
+        if snapshot(config) != before {
             return;
         }
 
@@ -16,8 +16,21 @@ pub fn wait_for_change(folder: &Path, before: Option<SystemTime>) {
     }
 }
 
-// the newest time in the folder, which moves forward whenever anything in it is saved
-pub fn snapshot(folder: &Path) -> Option<SystemTime> {
+// the newest time in the watched files, which moves forward whenever anything in them is saved
+pub fn snapshot(config: &Path) -> Option<SystemTime> {
+    let source = config.join("src");
+    let manifest = config.join("Cargo.toml");
+    let lock = config.join("Cargo.lock");
+
+    let mut latest = snapshot_folder(&source);
+
+    latest = Option::max(latest, modified(&manifest));
+    latest = Option::max(latest, modified(&lock));
+
+    latest
+}
+
+fn snapshot_folder(folder: &Path) -> Option<SystemTime> {
     // folders count too, since adding or removing a file only changes its folder's time
     let mut latest = modified(folder);
 
@@ -29,7 +42,7 @@ pub fn snapshot(folder: &Path) -> Option<SystemTime> {
         let path = entry.path();
 
         let time = if path.is_dir() {
-            snapshot(&path)
+            snapshot_folder(&path)
         } else {
             modified(&path)
         };
