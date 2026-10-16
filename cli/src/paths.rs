@@ -32,6 +32,13 @@ pub fn target_file() -> PathBuf {
         .join("config-path")
 }
 
+// where `amane update` remembers the repository folder, kept per machine
+pub fn repo_file() -> PathBuf {
+    base("XDG_STATE_HOME", ".local/state")
+        .join("amane")
+        .join("repo-path")
+}
+
 // where amane keeps the library, the generated project and build output
 pub fn cache() -> PathBuf {
     base("XDG_CACHE_HOME", ".cache").join("amane")
