@@ -5,7 +5,9 @@ use crate::cargo;
 use crate::{paths, project, restart};
 
 pub fn run(restart: bool) -> ExitCode {
-    let project = project::prepare();
+    let Some(project) = project::prepare() else {
+        return ExitCode::FAILURE;
+    };
 
     if !cargo::build(&project) {
         return ExitCode::FAILURE;
@@ -24,6 +26,8 @@ pub fn run(restart: bool) -> ExitCode {
     fs::rename(&fresh, &shell).expect("failed to replace shell");
 
     println!("built {}", shell.display());
+
+    project::sync_lock(&paths::config(), &project);
 
     if restart {
         return restart::run();
