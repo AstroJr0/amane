@@ -43,39 +43,85 @@ pub fn run(folder: Option<&str>) -> ExitCode {
         },
     };
 
+    println!("checking for updates in {}", repo.display());
+
+    let Ok(fetch_status) = Command::new("git")
+        .arg("fetch")
+        .current_dir(&repo)
+        .status()
+    else {
+        eprintln!("failed to run git fetch");
+        return ExitCode::FAILURE;
+    };
+
+    if !fetch_status.success() {
+        eprintln!("git fetch failed");
+        return ExitCode::FAILURE;
+    }
+
+    let local = git_rev(&repo, "HEAD");
+    let remote = git_rev(&repo, "FETCH_HEAD");
+
+    match (local, remote) {
+        (Some(l), Some(r)) if l == r => {
+            println!("amane is already up to date!");
+            return ExitCode::SUCCESS;
+        }
+
+        (None, _) | (_, None) => {
+            eprintln!("could not read git revisions, continuing anyway");
+        }
+
+        _ => {}
+    }
+
+    print!("updates available. pull and reinstall? [Y/n] ");
+
+    let _ = io::stdout().flush();
+
+    let mut input = String::new();
+
+    if io::stdin().read_line(&mut input).is_err() {
+        eprintln!("failed to read input");
+        return ExitCode::FAILURE;
+    }
+
+    let answer = input.trim().to_ascii_lowercase();
+
+    if answer == "n" || answer == "no" {
+        println!("skipped.");
+        return ExitCode::SUCCESS;
+    }
+
     println!("pulling {}", repo.display());
 
-    let Ok(status) = Command::new("git")
+    let Ok(pull_status) = Command::new("git")
         .arg("pull")
         .current_dir(&repo)
         .status()
     else {
         eprintln!("failed to run git pull");
-
         return ExitCode::FAILURE;
     };
 
-    if !status.success() {
+    if !pull_status.success() {
         eprintln!("git pull failed");
-
         return ExitCode::FAILURE;
     }
 
     println!("installing amane");
 
-    let Ok(status) = Command::new("cargo")
+    let Ok(install_status) = Command::new("cargo")
         .args(["install", "--path", "cli"])
         .current_dir(&repo)
         .status()
     else {
         eprintln!("failed to run cargo install");
-
         return ExitCode::FAILURE;
     };
 
-    if !status.success() {
+    if !install_status.success() {
         eprintln!("cargo install failed");
-
         return ExitCode::FAILURE;
     }
 
@@ -91,6 +137,20 @@ fn is_nix_install() -> bool {
     };
 
     exe.starts_with("/nix/store")
+}
+
+fn git_rev(repo: &Path, rev: &str) -> Option<String> {
+    let out = Command::new("git")
+        .args(["rev-parse", rev])
+        .current_dir(repo)
+        .output()
+        .ok()?;
+
+    if !out.status.success() {
+        return None;
+    }
+
+    Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
 fn find_repo() -> Option<PathBuf> {
