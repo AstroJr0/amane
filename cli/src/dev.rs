@@ -5,24 +5,26 @@ use crate::cargo;
 use crate::{paths, project, watch};
 
 pub fn run() -> ExitCode {
-    let project = project::prepare();
-
-    let source = paths::config().join("src");
+    let config = paths::config();
 
     let mut shell = None;
 
     loop {
         // taken before building, so a save during the build still starts another one
-        let before = watch::snapshot(&source);
+        let before = watch::snapshot(&config);
 
-        // a failed build keeps the old shell on screen while the error is fixed
-        if cargo::build(&project) {
-            stop(shell.take());
+        if let Some(project) = project::prepare() {
+            // a failed build keeps the old shell on screen while the error is fixed
+            if cargo::build(&project) {
+                stop(shell.take());
 
-            shell = start(&project);
+                shell = start(&project);
+
+                project::sync_lock(&config, &project);
+            }
         }
 
-        watch::wait_for_change(&source, before);
+        watch::wait_for_change(&config, before);
 
         println!("change found, rebuilding");
     }
