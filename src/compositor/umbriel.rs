@@ -182,8 +182,13 @@ fn parse_workspaces(workspaces: &[Value]) -> Option<Vec<Workspace>> {
 mod tests {
     use super::*;
 
-    const WORKSPACES_QUERY: &str = r#"{"ok":[{"id":1,"index":1,"name":"1","named":false,"output":"eDP-1","active":true,"focused":true,"urgent":false,"window_count":3},{"id":2,"index":2,"name":"web","named":true,"output":"eDP-1","active":false,"focused":false,"urgent":true,"window_count":1}]}"#;
-    const WORKSPACE_EVENT: &str = r#"{"event":"workspaces","data":[{"id":1,"index":1,"name":"1","named":false,"output":"eDP-1","active":true,"focused":true,"urgent":false,"window_count":2}]}"#;
+    const WORKSPACES_QUERY: &str = r#"{ "ok":[
+            { "id":1, "index":1, "name":"1",   "named":false, "output":"eDP-1", "active":true,  "focused":true,  "urgent":false, "window_count":3 },
+            { "id":2, "index":2, "name":"web", "named":true,  "output":"eDP-1", "active":false, "focused":false, "urgent":true,  "window_count":1 }
+        ]}"#;
+    const WORKSPACE_EVENT: &str = r#"{ "event":"workspaces", "data":[
+            { "id":1, "index":1, "name":"1", "named":false, "output":"eDP-1", "active":true, "focused":true, "urgent":false, "window_count":2 }
+        ]}"#;
 
     #[test]
     fn reads_workspaces_from_query() {
@@ -195,7 +200,9 @@ mod tests {
 
         #[test]
     fn follows_event_stream_snapshots_until_eof() {
-        let updated = r#"{"event":"workspaces","data":[{"id":1,"index":1,"name":"1","named":false,"output":"eDP-1","active":true,"focused":true,"urgent":false,"window_count":5}]}"#;
+        let updated = r#"{ "event":"workspaces", "data":[
+                { "id":1, "index":1, "name":"1", "named":false, "output":"eDP-1", "active":true, "focused":true, "urgent":false, "window_count":5 }
+            ]}"#;
         let input = format!(
             "{WORKSPACE_EVENT}\n{{\"event\":\"windows\",\"data\":[]}}\ninvalid\n{updated}\n"
         );
