@@ -144,6 +144,18 @@ amane clean
 amane clean --yes
 ```
 
+### amane update
+
+Updates the amane library itself. Works as an alias.
+
+```sh
+amane update
+```
+> [!CAUTION]
+> `amane update` *does* work on NixOS, but it executes `nix profile upgrade amane` in the background.
+> If amane was installed **System-Wide via Nix Flakes**, DO NOT confirm the confirmation prompt 
+> as packages must be updated through **your flake configuration** instead.
+
 ## Example
 
 This is the starter config that `amane new` creates. It puts a 30 pixel blue bar at the top of the screen with some text in it.
