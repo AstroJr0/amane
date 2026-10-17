@@ -141,7 +141,7 @@ Control calls from input handlers, like `Audio::set_volume`, don't run on the ma
 - Mango (`MANGO_INSTANCE_SIGNATURE`)
 - Umbriel (`UMBRIEL_SOCKET`)
 
-Every backend hands over the full workspace list after each event. **Niri** only sends what changed, so its backend remembers the rest and rebuilds the list itself. **Hyprland** and **Sway** are just asked for the full list again. **Mango** sends everything every time, and each tag counts as a workspace. `Workspaces` sorts the list by monitor and position, and if nothing changed (a window title changing is also a compositor event), it writes quietly. **Umbriel** hands over the full workspace list on each event, similar to Hyprland and Sway
+Every backend hands over the full workspace list after each event. **niri** only sends what changed, so its backend remembers the rest and rebuilds the list itself. **Hyprland** and **Sway** are just asked for the full list again. **Mango** sends everything every time, and each tag counts as a workspace. `Workspaces` sorts the list by monitor and position, and if nothing changed (a window title changing is also a compositor event), it writes quietly. **Umbriel** hands over the full workspace list on each event, similar to Hyprland and Sway.
 
 To add a compositor, you add one file in `src/compositor/`, its environment variable in `running()`, and one arm in each of the two `match`es (`listen` and `focus_workspace`).
 
@@ -203,7 +203,7 @@ src/
 ├── dbus.rs, dbus/     a small zbus wrapper: Bus, Method, Signal, Value
 ├── ipc.rs             IpcHandlers and IpcCall
 ├── compositor.rs      picks the workspace backend for the running compositor
-├── compositor/        niri, Hyprland, Sway and Mango IPC, used by Workspaces
+├── compositor/        niri, Hyprland, Sway, Mango and Umbriel IPC, used by Workspaces
 ├── process.rs         spawn, output, lines
 ├── files.rs           watch_file, through inotify
 ├── allocator.rs       glibc allocator limits for image decoding
