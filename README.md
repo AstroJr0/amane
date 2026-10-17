@@ -151,7 +151,7 @@ Updates the amane library itself. Works as an alias.
 ```sh
 amane update
 ```
-> [!CAUTION]
+> [!WARNING]
 > `amane update` *does* work on NixOS, but it executes `nix profile upgrade amane` in the background.
 > If amane was installed **System-Wide via Nix Flakes**, DO NOT confirm the confirmation prompt 
 > as packages must be updated through **your flake configuration** instead.
@@ -178,7 +178,7 @@ fn view() -> LayerWindow {
                 .width(Parent)
                 .height(Parent)
                 .fill(Color::BLUE)
-                .child(Text::new("hello world").size(20.0).color(Color::WHITE)),
+                .child(Text::new("hello from amane!").size(20.0).color(Color::WHITE)),
         )
 }
 ```
