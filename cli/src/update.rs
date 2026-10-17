@@ -112,7 +112,7 @@ pub fn run(folder: Option<&str>) -> ExitCode {
     println!("installing amane");
 
     let Ok(install_status) = Command::new("cargo")
-        .args(["install", "--path", "cli"])
+        .args(["install", "--locked", "--path", "cli"])
         .current_dir(&repo)
         .status()
     else {
