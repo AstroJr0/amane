@@ -31,7 +31,7 @@ To install it system-wide, add it to your flake inputs:
   };
 
   outputs = { nixpkgs, amane, ... }: {
-    nixosConfigurations.your-host = nixpkgs.lib.nixosSystem {
+    nixosConfigurations.<your-host> = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
         ./configuration.nix
@@ -44,7 +44,7 @@ To install it system-wide, add it to your flake inputs:
 }
 ```
 
-Replace `your-host` with your host's name, then rebuild.
+Replace `<your-host>` with your host's name, then rebuild.
 
 The `follows` line builds Amane with your system's nixpkgs, so it uses the same glibc as your graphics driver. Without it, the shell can fail to find your GPU.
 
@@ -81,9 +81,9 @@ The library is copied into the `amane` command when built. You can update your s
 amane update
 ```
 
->[!CAUTION]
-> `amane update` does work on NixOS, but it executes `nix profile upgrade amane` in the background.
-> If amane was installed System-Wide via Nix Flakes, DO NOT confirm the confirmation prompt
+>[!WARNING]
+> `amane update` *does* work on NixOS, but it executes `nix profile upgrade amane` in the background.
+> If amane was installed **System-Wide via Nix Flakes**, DO NOT confirm the confirmation prompt
 > as packages must be updated through your flake configuration instead.
 
 For manual updates:
