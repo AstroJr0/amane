@@ -75,9 +75,21 @@ The `amane` command runs `cargo` every time it builds your shell, so keep the Ru
 
 ## Updating
 
-The library is copied into the `amane` command when the command is built. To get a newer Amane, update the command itself:
+The library is copied into the `amane` command when built. You can update your setup seamlessly using the built-in command:
 
-- NixOS: `nix profile upgrade amane`, or update the flake input and rebuild.
-- Other distributions: `git pull` in the clone, then run `cargo install --path cli` again.
+```sh
+amane update
+```
 
-The next `amane compile` or `amane dev` rebuilds your shell with the new library.
+>[!CAUTION]
+> `amane update` does work on NixOS, but it executes `nix profile upgrade amane` in the background.
+> If amane was installed System-Wide via Nix Flakes, DO NOT confirm the confirmation prompt
+> as packages must be updated through your flake configuration instead.
+
+For manual updates:
+- NixOS (Profile): `nix profile upgrade amane`
+- Other Distributions: `git pull` in the clone, then run `cargo install --path cli` again.
+
+The next `amane compile` or `amane dev` will automatically rebuild your shell with the new library and features!
+
+
