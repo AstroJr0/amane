@@ -56,13 +56,13 @@ impl Gpu {
             },
         };
 
-        let mut encoder = self.device.create_command_encoder(&Default::default());
+        let mut encoder = self.take_encoder();
 
         encoder.begin_render_pass(&RenderPassDescriptor {
             color_attachments: &[Some(attachment)],
             ..Default::default()
         });
 
-        self.queue.submit([encoder.finish()]);
+        self.keep_encoder(encoder);
     }
 }

@@ -14,7 +14,7 @@ pub(super) fn drop_shadow(
     color: Color,
     blur: f32,
 ) {
-    // ponytail: vello blurs one radius, so shadows round every corner like the largest; trace a blurred path if mixed corners show
+    // vello blurs one radius, so shadows round every corner like the largest; trace a blurred path if mixed corners show
     scene.draw_blurred_rounded_rect(
         affine(transform),
         rounded(area),

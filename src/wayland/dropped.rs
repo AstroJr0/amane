@@ -68,7 +68,7 @@ impl DataDeviceHandler for WaylandState {
         let _ = self.connection.flush();
 
         /*
-         * ponytail: blocks the event loop until the other program has written
+         * blocks the event loop until the other program has written
          * the list, which is instant for file managers; read it on the loop if
          * a slow source ever stalls a frame
          */

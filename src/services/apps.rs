@@ -58,7 +58,7 @@ impl Apps {
 }
 
 fn scan() -> Vec<DesktopApp> {
-    let icons = icons::index();
+    let icon_folders = icons::read_icon_folders();
 
     // a file in an earlier dir overrides one with the same id in a later dir
     let mut seen = HashSet::new();
@@ -77,7 +77,7 @@ fn scan() -> Vec<DesktopApp> {
                 continue;
             }
 
-            let Some(app) = parse::read(&path, icons) else {
+            let Some(app) = parse::read(&path, &icon_folders) else {
                 continue;
             };
 

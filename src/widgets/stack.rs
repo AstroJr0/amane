@@ -73,4 +73,19 @@ impl Widget for Stack {
             child.collect_targets(Self::child_area(child.as_ref(), area), targets);
         }
     }
+
+    fn draw_and_collect_targets(
+        &self,
+        renderer: &mut Renderer,
+        area: Area,
+        targets: &mut Vec<Target>,
+    ) {
+        for child in &self.children {
+            child.draw_and_collect_targets(
+                renderer,
+                Self::child_area(child.as_ref(), area),
+                targets,
+            );
+        }
+    }
 }

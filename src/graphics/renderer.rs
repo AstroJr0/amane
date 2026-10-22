@@ -43,6 +43,11 @@ impl Renderer {
     }
 
     pub fn blend(&mut self, group: Renderer, opacity: f32) {
+        // rendering an invisible object is a waste of resource
+        if opacity <= 0.0 {
+            return;
+        }
+
         let cuts = group
             .commands
             .iter()

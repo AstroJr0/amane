@@ -33,9 +33,10 @@ fn key_handler(text_input: &TextInput) -> KeyHandler {
 
     let on_change = text_input.on_change.clone();
     let on_submit = text_input.on_submit.clone();
+    let password = text_input.password;
 
     let on_key = move |key: Key| match key {
-        Key::Enter => submit(id, on_submit.as_ref()),
+        Key::Enter => submit(id, on_submit.as_ref(), password),
         Key::Escape => focus::clear(),
         _ => edit(id, key, on_change.as_ref()),
     };
@@ -43,12 +44,16 @@ fn key_handler(text_input: &TextInput) -> KeyHandler {
     Rc::new(on_key)
 }
 
-fn submit(id: &'static str, on_submit: Option<&TextHandler>) {
+fn submit(id: &'static str, on_submit: Option<&TextHandler>, password: bool) {
     let Some(on_submit) = on_submit else {
         return;
     };
 
     on_submit(fields::get(id).text);
+
+    if password {
+        TextInput::set_text(id, "")
+    }
 }
 
 fn edit(id: &'static str, key: Key, on_change: Option<&TextHandler>) {

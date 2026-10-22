@@ -99,8 +99,12 @@ impl Gpu {
                 strength,
             } => {
                 if let Some(shape) = device_mask(area, radius, transform) {
+                    let mut encoder = self.take_encoder();
+
                     self.quads
-                        .erase(&self.device, &self.queue, canvas, shape, strength);
+                        .erase(&self.device, &mut encoder, canvas, shape, strength);
+
+                    self.keep_encoder(encoder);
                 } else if let Some(path) = area.trace(radius) {
                     self.cut(canvas, &path, transform, strength);
                 }
@@ -250,7 +254,7 @@ impl Gpu {
         canvas: &Texture,
         clips: Clips,
     ) {
-        self.quads.draw(&self.device, &self.queue, canvas);
+        self.draw_quads(canvas);
 
         let mut paths = Vec::new();
 
@@ -281,9 +285,18 @@ impl Gpu {
     }
 
     fn flush(&mut self, scene: &mut Scene, canvas: &Texture, borrowed: &mut Vec<ImageData>) {
-        self.quads.draw(&self.device, &self.queue, canvas);
+        self.draw_quads(canvas);
 
         self.paint(scene, canvas, borrowed);
+    }
+
+    // the quads gathered so far, written onto the frame's encoder
+    fn draw_quads(&mut self, canvas: &Texture) {
+        let mut encoder = self.take_encoder();
+
+        self.quads.draw(&self.device, &mut encoder, canvas);
+
+        self.keep_encoder(encoder);
     }
 }
 

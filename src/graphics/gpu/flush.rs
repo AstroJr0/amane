@@ -44,6 +44,8 @@ impl Gpu {
 
         let scratch = self.take_scratch(canvas.width(), canvas.height());
 
+        self.submit();
+
         let params = RenderParams {
             base_color: peniko::Color::TRANSPARENT,
             width: canvas.width(),
@@ -68,7 +70,7 @@ impl Gpu {
     pub(super) fn lay(&self, source: &Texture, canvas: &Texture, opacity: f32, premultiply: bool) {
         let premultiply = if premultiply { 1.0 } else { 0.0 };
 
-        let mut encoder = self.device.create_command_encoder(&Default::default());
+        let mut encoder = self.take_encoder();
 
         self.composite.run(
             &self.device,
@@ -78,6 +80,6 @@ impl Gpu {
             [opacity, premultiply, 0.0, 0.0],
         );
 
-        self.queue.submit([encoder.finish()]);
+        self.keep_encoder(encoder);
     }
 }

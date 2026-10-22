@@ -64,16 +64,14 @@ pub fn build(
 
     let mut renderer = Renderer::new(scale * scale_factor.get());
 
-    root.draw(&mut renderer, area);
+    let mut targets = Vec::new();
+
+    root.draw_and_collect_targets(&mut renderer, area, &mut targets);
 
     let reads = changes::take_read();
 
     // read after drawing, since a shader that runs on time sets it while drawing
     let moving = moving::take();
-
-    let mut targets = Vec::new();
-
-    root.collect_targets(area, &mut targets);
 
     // pointer positions use surface units; undo the global scale before each widget's transform
     let inverse = Transform::from_scale(scale_factor.logical(1.0), scale_factor.logical(1.0));

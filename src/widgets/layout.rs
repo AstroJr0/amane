@@ -173,4 +173,18 @@ impl Widget for Layout {
             child.collect_targets(child_area, targets);
         }
     }
+
+    fn draw_and_collect_targets(
+        &self,
+        renderer: &mut Renderer,
+        area: Area,
+        targets: &mut Vec<Target>,
+    ) {
+        let child_areas = self.place(area);
+
+        for (child, child_area) in self.children.iter().zip(child_areas) {
+            child.draw_and_collect_targets(renderer, child_area, targets);
+        }
+    }
+
 }

@@ -122,7 +122,7 @@ impl Gpu {
             },
         };
 
-        let mut encoder = self.device.create_command_encoder(&Default::default());
+        let mut encoder = self.take_encoder();
 
         {
             let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
@@ -138,7 +138,7 @@ impl Gpu {
             pass.draw(0..6, 0..1);
         }
 
-        self.queue.submit([encoder.finish()]);
+        self.keep_encoder(encoder);
     }
 
     fn uniform(&self, values: [f32; 4]) -> Buffer {

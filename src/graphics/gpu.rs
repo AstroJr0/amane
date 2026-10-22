@@ -4,6 +4,7 @@ mod clip;
 mod convert;
 mod cut;
 mod dispatch;
+mod encoder;
 mod flush;
 mod forget;
 mod glyph;
@@ -35,7 +36,8 @@ use std::sync::Arc;
 
 use vello::peniko::ImageData;
 use vello::wgpu::{
-    BlendState, Device, Queue, Surface, SurfaceConfiguration, Texture, TextureFormat,
+    BlendState, CommandEncoder, Device, Queue, Surface, SurfaceConfiguration, Texture,
+    TextureFormat,
 };
 
 use crate::graphics::image::Bitmap;
@@ -93,6 +95,9 @@ pub struct Gpu {
     painted: Vec<Option<painted::Painted>>,
     painting: usize,
 
+    // the frame's jobs not mailed yet; none between frames and right after mailing
+    pending: RefCell<Option<CommandEncoder>>,
+
     composite: Pass,
     present: Pass,
     box_blur: Pass,
@@ -148,6 +153,8 @@ impl Gpu {
 
             painted: Vec::new(),
             painting: 0,
+
+            pending: RefCell::new(None),
 
             composite,
             present,

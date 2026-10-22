@@ -50,7 +50,7 @@ impl Gpu {
         let first = texture::blur(&self.device, width, height);
         let second = texture::blur(&self.device, width, height);
 
-        let mut encoder = self.device.create_command_encoder(&Default::default());
+        let mut encoder = self.take_encoder();
 
         let area = TexelCopyTextureInfo {
             texture: canvas,
@@ -95,7 +95,7 @@ impl Gpu {
             );
         }
 
-        self.queue.submit([encoder.finish()]);
+        self.keep_encoder(encoder);
 
         let mut blurred = self.vello.borrow_mut().register_texture(first);
 

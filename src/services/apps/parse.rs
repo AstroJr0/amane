@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use super::{DesktopApp, exec};
+use super::{DesktopApp, exec, icons};
 
 // the desktop file id: its path inside applications/, with / turned into -
 pub fn id(applications: &Path, path: &Path) -> Option<String> {
@@ -18,7 +18,7 @@ pub fn id(applications: &Path, path: &Path) -> Option<String> {
 }
 
 // none for files that are not programs, or that ask not to be shown in menus
-pub fn read(path: &Path, icons: &HashMap<String, PathBuf>) -> Option<DesktopApp> {
+pub fn read(path: &Path, icon_folders: &[Vec<PathBuf>]) -> Option<DesktopApp> {
     let text = fs::read_to_string(path).ok()?;
 
     let fields = main_section(&text);
@@ -36,7 +36,7 @@ pub fn read(path: &Path, icons: &HashMap<String, PathBuf>) -> Option<DesktopApp>
 
     let icon = fields.get("Icon").map(|icon| icon.to_string());
 
-    let icon_path = icon.as_deref().and_then(|icon| find_icon(icon, icons));
+    let icon_path = icon.as_deref().and_then(|icon| find_icon(icon, icon_folders));
 
     let description = fields
         .get("Comment")
@@ -86,12 +86,12 @@ fn is_true(value: Option<&&str>) -> bool {
 }
 
 // an icon can be a full path instead of a name from the theme
-fn find_icon(icon: &str, icons: &HashMap<String, PathBuf>) -> Option<PathBuf> {
+fn find_icon(icon: &str, icon_folders: &[Vec<PathBuf>]) -> Option<PathBuf> {
     let path = Path::new(icon);
 
     if path.is_absolute() {
         return Some(path.to_path_buf());
     }
 
-    icons.get(icon).cloned()
+    icons::look_up_icon_file(icon, icon_folders)
 }

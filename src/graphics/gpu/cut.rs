@@ -28,7 +28,7 @@ impl Gpu {
     pub(super) fn erase_covered(&mut self, scene: &Scene, canvas: &Texture, strength: f32) {
         let coverage = self.render(scene, canvas);
 
-        let mut encoder = self.device.create_command_encoder(&Default::default());
+        let mut encoder = self.take_encoder();
 
         // the shape still needs premultiplying, and its alpha is scaled by the strength
         self.erase.run(
@@ -39,7 +39,7 @@ impl Gpu {
             [strength, 1.0, 0.0, 0.0],
         );
 
-        self.queue.submit([encoder.finish()]);
+        self.keep_encoder(encoder);
 
         self.give_back(coverage);
     }

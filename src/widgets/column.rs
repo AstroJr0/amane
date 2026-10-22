@@ -63,4 +63,14 @@ impl Widget for Column {
     fn collect_targets(&self, area: Area, targets: &mut Vec<Target>) {
         self.layout.collect_targets(area, targets);
     }
+
+    fn draw_and_collect_targets(
+        &self,
+        renderer: &mut Renderer,
+        area: Area,
+        targets: &mut Vec<Target>,
+    ) {
+        self.layout
+            .draw_and_collect_targets(renderer, area, targets);
+    }
 }

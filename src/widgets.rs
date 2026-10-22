@@ -31,6 +31,18 @@ pub trait Widget {
 
     fn draw(&self, renderer: &mut Renderer, area: Area);
 
+    fn draw_and_collect_targets(
+        &self,
+        renderer: &mut Renderer,
+        area: Area,
+        targets: &mut Vec<Target>,
+    ) {
+        self.draw(renderer, area);
+
+        self.collect_targets(area, targets);
+
+    }
+
     // widgets that react to the pointer add their area, containers pass theirs on to children
     fn collect_targets(&self, _: Area, _: &mut Vec<Target>) {}
 }

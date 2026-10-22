@@ -1,7 +1,7 @@
 use vello::wgpu::util::{BufferInitDescriptor, DeviceExt};
 use vello::wgpu::{
-    BindGroupDescriptor, BindGroupEntry, BindingResource, BufferUsages, Device, LoadOp, Operations,
-    Queue, RenderPassColorAttachment, RenderPassDescriptor, StoreOp, Texture,
+    BindGroupDescriptor, BindGroupEntry, BindingResource, BufferUsages, CommandEncoder, Device,
+    LoadOp, Operations, RenderPassColorAttachment, RenderPassDescriptor, StoreOp, Texture,
 };
 
 use crate::graphics::gpu::texture;
@@ -15,24 +15,30 @@ impl Quads {
     }
 
     // draws everything gathered onto the canvas, over what is already there
-    pub fn draw(&mut self, device: &Device, queue: &Queue, canvas: &Texture) {
-        self.draw_with(device, queue, canvas, false);
+    pub fn draw(&mut self, device: &Device, encoder: &mut CommandEncoder, canvas: &Texture) {
+        self.draw_with(device, encoder, canvas, false);
     }
 
     pub fn erase(
         &mut self,
         device: &Device,
-        queue: &Queue,
+        encoder: &mut CommandEncoder,
         canvas: &Texture,
         shape: Clip,
         strength: f32,
     ) {
         self.mask(shape, strength);
 
-        self.draw_with(device, queue, canvas, true);
+        self.draw_with(device, encoder, canvas, true);
     }
 
-    fn draw_with(&mut self, device: &Device, queue: &Queue, canvas: &Texture, erase: bool) {
+    fn draw_with(
+        &mut self,
+        device: &Device,
+        encoder: &mut CommandEncoder,
+        canvas: &Texture,
+        erase: bool,
+    ) {
         if self.waiting.is_empty() {
             return;
         }
@@ -83,8 +89,6 @@ impl Quads {
 
         let target = texture::view(canvas);
 
-        let mut encoder = device.create_command_encoder(&Default::default());
-
         {
             let attachment = RenderPassColorAttachment {
                 view: &target,
@@ -121,8 +125,6 @@ impl Quads {
                 pass.draw(0..6, run.first..run.first + run.count);
             }
         }
-
-        queue.submit([encoder.finish()]);
     }
 }
 
@@ -152,16 +154,19 @@ mod tests {
         let canvas = texture::canvas(&device, 16, 16);
         let mut quads = Quads::new(&device, &queue);
 
+        // every pass shares one encoder, like a real frame
+        let mut encoder = device.create_command_encoder(&Default::default());
+
         quads.rectangle(
             Area::new(0.0, 0.0, 16.0, 16.0),
             Corners::default(),
             Color::BLUE,
             Clips::default(),
         );
-        quads.draw(&device, &queue, &canvas);
+        quads.draw(&device, &mut encoder, &canvas);
         quads.erase(
             &device,
-            &queue,
+            &mut encoder,
             &canvas,
             Clip {
                 area: Area::new(4.0, 4.0, 8.0, 8.0),
@@ -171,7 +176,7 @@ mod tests {
         );
         quads.erase(
             &device,
-            &queue,
+            &mut encoder,
             &canvas,
             Clip {
                 area: Area::new(0.0, 0.0, 4.0, 4.0),
@@ -185,7 +190,7 @@ mod tests {
             Color::RED,
             Clips::default(),
         );
-        quads.draw(&device, &queue, &canvas);
+        quads.draw(&device, &mut encoder, &canvas);
 
         let readback = device.create_buffer(&BufferDescriptor {
             label: None,
@@ -193,7 +198,6 @@ mod tests {
             usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
             mapped_at_creation: false,
         });
-        let mut encoder = device.create_command_encoder(&Default::default());
         encoder.copy_texture_to_buffer(
             canvas.as_image_copy(),
             TexelCopyBufferInfo {

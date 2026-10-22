@@ -1,25 +1,12 @@
-use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::OnceLock;
 
-use super::{data_dirs, walk};
+use super::data_dirs;
 
-/*
- * walking the themes takes seconds, so it happens once per run; an icon
- * installed or a theme switched while the shell runs shows after a restart
- */
-static INDEX: OnceLock<HashMap<String, PathBuf>> = OnceLock::new();
-
-// every icon name the themes have, with the best file for it
-pub fn index() -> &'static HashMap<String, PathBuf> {
-    INDEX.get_or_init(walk_themes)
-}
-
-fn walk_themes() -> HashMap<String, PathBuf> {
-    let mut icons = HashMap::new();
+pub fn read_icon_folders() -> Vec<Vec<PathBuf>> {
+    let mut icon_folders = Vec::new();
 
     let mut roots = Vec::new();
 
@@ -39,16 +26,22 @@ fn walk_themes() -> HashMap<String, PathBuf> {
 
     for theme in &themes {
         for root in &roots {
-            add_theme(&root.join(theme), &mut icons);
+            let theme_icon_folders = read_theme_icon_folders(&root.join(theme));
+
+            if theme_icon_folders.is_empty() {
+                continue;
+            }
+
+            icon_folders.push(theme_icon_folders)
         }
     }
 
     // loose icons that belong to no theme
     for dir in data_dirs::find() {
-        add_theme(&dir.join("pixmaps"), &mut icons);
+        icon_folders.push(vec![dir.join("pixmaps")]);
     }
 
-    icons
+    icon_folders
 }
 
 /*
@@ -99,40 +92,6 @@ fn parents(theme: &str, roots: &[PathBuf]) -> Vec<String> {
     }
 
     Vec::new()
-}
-
-// a name found in an earlier theme stays, later themes only fill in the gaps
-fn add_theme(dir: &Path, icons: &mut HashMap<String, PathBuf>) {
-    let mut found: HashMap<String, PathBuf> = HashMap::new();
-
-    for path in walk::files(dir) {
-        let Some(name) = path.file_stem().and_then(|stem| stem.to_str()) else {
-            continue;
-        };
-
-        if !is_image(&path) {
-            continue;
-        }
-
-        let better = match found.get(name) {
-            Some(current) => score(&path) > score(current),
-            None => true,
-        };
-
-        if better {
-            found.insert(name.to_string(), path);
-        }
-    }
-
-    for (name, path) in found {
-        icons.entry(name).or_insert(path);
-    }
-}
-
-fn is_image(path: &Path) -> bool {
-    let extension = path.extension().and_then(|extension| extension.to_str());
-
-    matches!(extension, Some("png" | "svg"))
 }
 
 /*
@@ -212,4 +171,94 @@ fn dconf_theme() -> Option<String> {
     }
 
     Some(String::from(theme))
+}
+
+fn read_index_theme(theme: &Path) -> String {
+    fs::read_to_string(theme.join("index.theme")).unwrap_or_default()
+}
+
+fn parse_icon_folder_names(index_theme: &str) -> Vec<&str> {
+    let mut icon_folder_names = Vec::new();
+
+    for line in index_theme.lines() {
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+
+        if !matches!(key, "Directories" | "ScaledDirectories") {
+            continue;
+        }
+
+        for icon_folder_name in value.split(',') {
+            let icon_folder_name = icon_folder_name.trim();
+
+            // a comma at the end of the line leaves an empty piece
+            if icon_folder_name.is_empty() {
+                continue;
+            }
+
+            icon_folder_names.push(icon_folder_name);
+        }
+    }
+
+    icon_folder_names
+}
+
+fn read_theme_icon_folders(theme: &Path) -> Vec<PathBuf> {
+    let index_theme = read_index_theme(theme);
+
+    let mut theme_icon_folders = Vec::new();
+
+    for icon_folder_name in parse_icon_folder_names(&index_theme) {
+        theme_icon_folders.push(theme.join(icon_folder_name));
+    }
+
+    theme_icon_folders
+}
+
+fn look_up_icon_file_in_folder(icon_name: &str, icon_folder: &Path) -> Option<PathBuf> {
+    for extension in ["svg", "png"] {
+        let icon_file = icon_folder.join(format!("{icon_name}.{extension}"));
+
+        if icon_file.is_file() {
+            return Some(icon_file);
+        }
+    }
+
+    None
+}
+
+// a theme keeps the same icon in many sizes, so every folder is checked for the sharpest one
+fn look_up_icon_file_in_theme(icon_name: &str, theme_icon_folders: &[PathBuf]) -> Option<PathBuf> {
+    let mut best_icon_file: Option<PathBuf> = None;
+
+    for icon_folder in theme_icon_folders {
+        let Some(icon_file) = look_up_icon_file_in_folder(icon_name, icon_folder) else {
+            continue;
+        };
+
+        let is_better = match &best_icon_file {
+            Some(best) => score(&icon_file) > score(best),
+            None => true,
+        };
+
+        if is_better {
+            best_icon_file = Some(icon_file);
+        }
+    }
+
+    best_icon_file
+}
+
+// the user's theme first, so a later theme only fills in icons it lacks
+pub fn look_up_icon_file(icon_name: &str, icon_folders: &[Vec<PathBuf>]) -> Option<PathBuf> {
+    for theme_icon_folders in icon_folders {
+        let Some(icon_file) = look_up_icon_file_in_theme(icon_name, theme_icon_folders) else {
+            continue;
+        };
+
+        return Some(icon_file);
+    }
+
+    None
 }

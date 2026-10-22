@@ -32,7 +32,7 @@ impl Gpu {
 
         let target = frame.texture.create_view(&Default::default());
 
-        let mut encoder = self.device.create_command_encoder(&Default::default());
+        let mut encoder = self.take_encoder();
 
         self.present.run(
             &self.device,
@@ -42,7 +42,9 @@ impl Gpu {
             [1.0, 0.0, 0.0, 0.0],
         );
 
-        self.queue.submit([encoder.finish()]);
+        self.keep_encoder(encoder);
+
+        self.submit();
 
         self.give_back(canvas);
 
