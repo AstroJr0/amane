@@ -16,7 +16,7 @@
   <img src="https://img.shields.io/badge/rust-2024_edition-16151d?logo=rust&logoColor=white" alt="rust 2024 edition">
 </p>
 
-Amane is a Rust library for building Wayland desktop shells, like bars, panels and launchers. You write your shell in plain Rust, and the `amane` CLI builds and runs it for you. And it's 🚀⚡️BBLAAAZZINGGLYY FASTTT⚡️🚀 (so funny)
+Amane is a Rust library for building Wayland desktop shells, like bars, panels and launchers. You write your shell in plain Rust, and the `amane` CLI builds and runs it for you. And it's 🚀⚡️BBLAAAZZINGGLYY FAST⚡️🚀 (so funny)
 
 Keep in mind, Amane is still early (0.1) and experimental, so things will break and change.
 
