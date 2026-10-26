@@ -13,52 +13,77 @@ mod target;
 mod update;
 mod watch;
 
-use std::env;
+use clap::{Parser, Subcommand};
 use std::process::ExitCode;
 
+#[derive(Parser, Debug)]
+#[command(name = "amane", version, about)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+// enumeration of all the available commands
+#[derive(Subcommand, Debug)]
+enum Commands {
+    New {
+        // Target installation directory [defaults to ~/.config/amane]
+        folder: Option<String>,
+        #[arg(long)]
+        example: bool,
+    },
+    // depricated command, idk when it will be removed
+    #[command(hide = true)]
+    Startup {
+        #[arg(long)]
+        example: bool,
+    },
+    Target { folder: Option<String>, },
+    Update { folder: Option<String>, },
+    Compile {
+        #[arg(long)]
+        restart: bool,
+    },
+    Run,
+    Restart,
+    Dev,
+    Clean {
+        #[arg(long)]
+        yes: bool,
+    },
+    Ipc {
+        #[command(subcommand)]
+        action: IpcAction,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum IpcAction {
+    Call {
+        // target name
+        name: String,
+        // args
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    },
+}
+
 fn main() -> ExitCode {
-    let arguments: Vec<String> = env::args().skip(1).collect();
+    let cli = Cli::parse();
 
-    let words: Vec<&str> = arguments.iter().map(String::as_str).collect();
-
-    match words.as_slice() {
-        ["new"] => new::run(None, false),
-
-        ["new", "--example"] => new::run(None, true),
-
-        ["new", folder] => new::run(Some(folder), false),
-
-        ["new", folder, "--example"] => new::run(Some(folder), true),
-
-        ["startup"] => startup(false),
-
-        ["startup", "--example"] => startup(true),
-
-        ["target"] => target::run(None),
-
-        ["target", folder] => target::run(Some(folder)),
-
-        ["update"] => update::run(None),
-
-        ["update", folder] => update::run(Some(folder)),
-
-        ["compile"] => compile::run(false),
-
-        ["compile", "--restart"] => compile::run(true),
-
-        ["run"] => run::run(),
-
-        ["restart"] => restart::run(),
-
-        ["dev"] => dev::run(),
-
-        ["clean"] => clean::run(false),
-
-        ["clean", "--yes"] => clean::run(true),
-
-        ["ipc", "call", name, ..] => call::run(name, &arguments[3..]),
-
-        _ => usage(),
+    match cli.command {
+        Commands::New { folder, example } => new::run(folder.as_deref(), example),
+        Commands::Startup { example } => startup(example),
+        Commands::Target { folder } => target::run(folder.as_deref()),
+        Commands::Update { folder } => update::run(folder.as_deref()),
+        Commands::Compile { restart } => compile::run(restart),
+        Commands::Run => run::run(),
+        Commands::Restart => restart::run(),
+        Commands::Dev => dev::run(),
+        Commands::Clean { yes } => clean::run(yes),
+        Commands::Ipc { action } => match action {
+            IpcAction::Call { name, args } => call::run(&name, &args),
+        },
     }
 }
 
@@ -69,26 +94,4 @@ fn startup(example: bool) -> ExitCode {
     );
 
     new::run(None, example)
-}
-
-fn usage() -> ExitCode {
-    eprintln!("usage:");
-    eprintln!("  amane new [folder]                   create a shell, in ~/.config/amane by default");
-    eprintln!("  amane new [folder] --example         create a full example bar instead");
-    eprintln!("  amane target [folder]                show or set the folder your shell lives in");
-    eprintln!("  amane update [folder]                pull the repository and rebuild the amane command");
-    eprintln!("  amane dev                           rebuild and restart on every save");
-    eprintln!("  amane compile                        build the optimised shell");
-    eprintln!("  amane compile --restart              build it, then restart the running shell");
-    eprintln!("  amane run                            start the compiled shell");
-    eprintln!(
-        "  amane restart                        stop the running shell and start the compiled one"
-    );
-    eprintln!(
-        "  amane clean                          remove the build cache, keep the compiled shell"
-    );
-    eprintln!("  amane clean --yes                    the same, without asking first");
-    eprintln!("  amane ipc call <name> [arguments...] call a handler in the running shell");
-
-    ExitCode::FAILURE
 }
