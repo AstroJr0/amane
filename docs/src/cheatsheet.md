@@ -108,7 +108,7 @@ use amane::*;
 | `.opacity(0.5)` | fades it and its child |
 | `.shadow(Shadow::drop("#000").blur(12.0).offset(0.0, 4.0).opacity(0.3))` | a drop shadow |
 | `.shadow(Shadow::inner("#000").blur(8.0))` | an inner shadow |
-| `.blur(20.0)` | blurs what your window drew behind it |
+| `.blur()` | the compositor blurs what is behind the window, inside it |
 | `.padding(8.0)` | space inside the edges. Or `Padding { top, right, bottom, left }`. |
 | `.align_child(Center, Center)` | places the child: horizontal, then vertical |
 | `.clip()` | cuts the child off at the edges and corners |
