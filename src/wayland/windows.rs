@@ -71,6 +71,8 @@ impl WaylandState {
 
             input_region: None,
 
+            blurred: Vec::new(),
+
             width: 0,
             height: 0,
 
@@ -89,9 +91,13 @@ impl WaylandState {
 
             fractional,
 
+            background_effect: None,
+
             role,
 
             compositor: self.compositor.wl_compositor().clone(),
+
+            effect_manager: self.background_effect.clone(),
 
             qh: self.qh.clone(),
         };
