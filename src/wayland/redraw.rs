@@ -43,7 +43,7 @@ impl OpenWindow {
             return;
         };
 
-        let frame = frame::build(
+        let mut frame = frame::build(
             root.as_ref(),
             self.width,
             self.height,
@@ -69,6 +69,11 @@ impl OpenWindow {
         }
 
         let drawn = Instant::now();
+
+        // sent before the frame's commit, which is what applies it
+        let blurs = frame.renderer.take_blurs();
+
+        self.update_blur(&blurs);
 
         let presented = self.present(frame.renderer);
 
