@@ -6,6 +6,7 @@ use smithay_client_toolkit::{
     session_lock::SessionLockSurface,
     shell::{WaylandSurface, wlr_layer::LayerSurface, xdg::window::Window as XdgWindow},
 };
+use smithay_client_toolkit::reexports::protocols::ext::background_effect::v1::client::ext_background_effect_manager_v1::ExtBackgroundEffectManagerV1;
 use wayland_client::{
     QueueHandle,
     protocol::{wl_compositor::WlCompositor, wl_output::WlOutput, wl_surface::WlSurface},
@@ -18,6 +19,7 @@ use crate::{InputArea, LayerWindow, Monitor, Widget, Window};
 
 use super::{
     WaylandState,
+    blur::BackgroundEffect,
     layer::{self, Settings},
     scale::Fractional,
 };
@@ -31,6 +33,9 @@ pub struct OpenWindow {
 
     // the input region last sent, so only a real change is sent again
     pub input_region: Option<Vec<InputArea>>,
+
+    // what the compositor was last told to blur, in surface units, so only a real change is sent again
+    pub blurred: Vec<InputArea>,
 
     pub width: u32,
     pub height: u32,
@@ -57,10 +62,16 @@ pub struct OpenWindow {
     // none at whole scales; dropped before the role, since it belongs to its surface
     pub fractional: Option<Fractional>,
 
+    // made when the first rectangle blurs; dropped before the role, since it belongs to its surface
+    pub background_effect: Option<BackgroundEffect>,
+
     pub role: Role,
 
     // kept to make input regions, which come from the compositor
     pub compositor: WlCompositor,
+
+    // kept to make the effect of a surface, none when the compositor lacks it
+    pub effect_manager: Option<ExtBackgroundEffectManagerV1>,
 
     pub qh: QueueHandle<WaylandState>,
 }
