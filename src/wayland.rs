@@ -1,3 +1,4 @@
+mod blur;
 mod compositor;
 mod dropped;
 mod keyboard;
@@ -15,6 +16,7 @@ mod update;
 mod wake;
 mod windows;
 
+use smithay_client_toolkit::reexports::protocols::ext::background_effect::v1::client::ext_background_effect_manager_v1::ExtBackgroundEffectManagerV1;
 use smithay_client_toolkit::reexports::protocols::wp::{
     fractional_scale::v1::client::wp_fractional_scale_manager_v1::WpFractionalScaleManagerV1,
     viewporter::client::wp_viewporter::WpViewporter,
@@ -70,6 +72,9 @@ struct WaylandState {
     // both are needed for fractional scales like 1.25, none when the compositor lacks one
     fractional_scale: Option<WpFractionalScaleManagerV1>,
     viewporter: Option<WpViewporter>,
+
+    // blurs what is behind a window, none when the compositor lacks it and rectangles blur nothing
+    background_effect: Option<ExtBackgroundEffectManagerV1>,
 
     /*
      * the lock screen's view, what asks the compositor for a lock (kept, so
@@ -130,6 +135,7 @@ impl WaylandApp {
 
         let fractional_scale = globals.bind(&qh, 1..=1, ()).ok();
         let viewporter = globals.bind(&qh, 1..=1, ()).ok();
+        let background_effect = globals.bind(&qh, 1..=1, ()).ok();
 
         let data_device_manager = DataDeviceManagerState::bind(&globals, &qh).ok();
 
@@ -154,6 +160,7 @@ impl WaylandApp {
 
             fractional_scale,
             viewporter,
+            background_effect,
 
             lock_view,
             lock_state: None,
@@ -233,3 +240,4 @@ fn connect() -> Connection {
 delegate_registry!(WaylandState);
 
 delegate_dispatch2!(WaylandState);
+    
