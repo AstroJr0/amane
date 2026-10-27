@@ -41,23 +41,6 @@ impl Renderer {
         });
     }
 
-    pub fn blur(&mut self, area: Area, radius: Corners, amount: f32) {
-        // most rectangles ask for no blur, so they skip copying pixels
-        if amount == 0.0 {
-            return;
-        }
-
-        let Some(path) = area.trace(radius) else {
-            return;
-        };
-
-        self.commands.push(Command::Blur {
-            path,
-            transform: self.transform,
-            amount,
-        });
-    }
-
     pub fn cut(&mut self, area: Area, radius: Corners, strength: f32) {
         if area.width <= 0.0 || area.height <= 0.0 {
             return;
