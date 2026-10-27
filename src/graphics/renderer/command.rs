@@ -94,13 +94,6 @@ pub enum Command {
         transform: Transform,
     },
 
-    // blurs what the commands before it drew inside the path, amount is in logical pixels
-    Blur {
-        path: BezierPath,
-        transform: Transform,
-        amount: f32,
-    },
-
     // erases the rounded rectangle from what came before, strength 1 erases fully
     Cut {
         area: Area,
