@@ -39,7 +39,7 @@ I came to this after writing a Quickshell config. My volume slider was jaggy bec
 
 `run()` first checks that you set at least one window and panics if you didn't. Then it calls `allocator::limit`, which tunes glibc's allocator so the memory used to decode big images goes back to the system afterwards instead of staying in the process. It sets the default font if you gave one, and hands everything to `WaylandApp::new` in `src/wayland.rs`. A `GpuSession` guard outlives the backend and releases the shared GPU cache after the windows are gone, on normal exit or startup failure. This happens before thread-local teardown, while wgpu's own thread-local state is still available.
 
-`WaylandApp::new` connects to the compositor and binds the protocols Amane needs. Amane uses smithay-client-toolkit (SCTK) for this, so it doesn't have to write the Wayland boilerplate by hand. The compositor, wlr-layer-shell, xdg-shell and shm are required, so a missing one is a panic. Fractional scaling, the viewporter and drag-and-drop are optional, and Amane works without them.
+`WaylandApp::new` connects to the compositor and binds the protocols Amane needs. Amane uses smithay-client-toolkit (SCTK) for this, so it doesn't have to write the Wayland boilerplate by hand. The compositor, wlr-layer-shell, xdg-shell and shm are required, so a missing one is a panic. Fractional scaling, the viewporter, background blur (`ext-background-effect-v1`) and drag-and-drop are optional, and Amane works without them.
 
 Then the windows open. Per-monitor windows wait until the compositor has described each monitor. A layer window runs its view once at 0 by 0 before its surface even exists, because it needs the settings the view asks for (size, anchor, layer and so on) to create the surface. Nothing is drawn yet. Drawing starts when the compositor sends the first configure.
 
@@ -62,6 +62,8 @@ First it runs the view. `frame::run_view` clears the list of Services read so fa
 Then `update_surface` (in `src/wayland/update.rs`) compares the window settings the view asked for (size, anchor, layer, margin, keyboard mode, exclusive zone, visibility, input region) with the ones it last sent, and only sends what changed. Hiding a window takes its buffer away and sets its size to 0. If the window is hidden or not configured yet, the frame stops here.
 
 Next, `frame::build` lays the tree out in the window and asks every widget to draw into a `Renderer`. Nothing is drawn yet at this point. The renderer only records a list of `Command`s. Some widgets read Services while drawing too (an image that is still decoding does this), so those reads are added to the window's list. After drawing, `build` collects the input targets, which replace the last frame's targets in the window's `Pointer`. The view's `on_key` replaces the old one the same way.
+
+A rectangle that asks for `blur` draws nothing. The renderer only records its shape in buffer pixels, and `update_blur` (in `src/wayland/blur.rs`) turns the shapes into a `wl_region` *(wayland region)* and sends it, only when it changed, before the frame's commit. A rounded corner becomes a staircase of rows, since a region is only rectangles.
 
 `App::scale_factor` is separate from the compositor's output scale. The backend keeps surface dimensions in compositor units, scales the window requests, and divides configured dimensions by the app factor for views and layout. Drawing combines both factors. Input targets undo only the app factor, because Wayland pointer positions already account for output scaling. `window_size()` and `Monitor` dimensions therefore use the same units as widgets.
 
@@ -107,7 +109,7 @@ The `Gpu` in `src/graphics/gpu.rs` draws that list onto a canvas texture, then c
 
 The `Gpu` walks the commands in `src/graphics/gpu/paint.rs` and sends each one to the cheapest engine that can draw it. Rectangles, borders, letters and images go to Amane's own quad pipeline (`quads.wgsl`), as long as they aren't rotated. That's most of what a shell draws, and plain triangles are much faster than vector shapes. Everything else (paths, strokes, gradients, shadows) goes to vello. To keep the order right, whichever engine was collecting work draws it before the other one takes over.
 
-Blur, cut and custom shader commands are different, because they work on what the canvas already holds. So everything before them gets drawn first, and then they run. A faded group, or a clip that has one of those effects inside it, is drawn on its own canvas and laid down as one piece.
+Cut and custom shader commands are different, because they work on what the canvas already holds. So everything before them gets drawn first, and then they run. A faded group, or a clip that has one of those effects inside it, is drawn on its own canvas and laid down as one piece.
 
 Vello costs about the same no matter how little it draws, so if a vello scene is exactly the same as last frame, its old result is laid down again instead (`painted.rs`). Scenes with images or gradients are never reused this way, because the textures they point at can change.
 
@@ -184,6 +186,7 @@ src/
 │   ├── normal.rs      xdg windows
 │   ├── lock.rs        the session lock surfaces
 │   ├── scale.rs       fractional scale
+│   ├── blur.rs        background blur regions (ext-background-effect-v1)
 │   ├── socket.rs      the IPC socket source
 │   └── wake.rs        the wake ping source
 ├── widgets.rs         the Widget trait
@@ -215,7 +218,7 @@ examples/              one small program per feature
 
 Breaking any of these gives you a crash, a freeze, or a window that silently stops updating.
 
-Struct field order is drop order. Rust drops fields from top to bottom, and some things have to die before others. In `OpenWindow`, `gpu` comes before `fractional`, which comes before `role`, because the GPU draws into the surface and the fractional scale object belongs to that surface. In `WaylandState`, `windows` comes before `connection`. In `WaylandApp`, `state` comes before `event_loop`, because the event loop holds the connection the GPU draws through. **DO NOT reorder these fields.**
+Struct field order is drop order. Rust drops fields from top to bottom, and some things have to die before others. In `OpenWindow`, `gpu` comes before `fractional`, which comes before `background_effect`, which comes before `role`, because the GPU draws into the surface and the fractional scale and blur objects belong to that surface. In `WaylandState`, `windows` comes before `connection`. In `WaylandApp`, `state` comes before `event_loop`, because the event loop holds the connection the GPU draws through. **DO NOT reorder these fields.**
 
 Wayland and drawing stay on the main thread. Other threads never touch `WaylandState`. They mark a change and ping (`changes::mark` or `changes::mark_all`), and the event loop does the actual work.
 
