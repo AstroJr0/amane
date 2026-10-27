@@ -111,4 +111,3 @@ mod tests {
         assert!(renderer.take_blurs().is_empty());
     }
 }
-                                
