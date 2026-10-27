@@ -1,3 +1,4 @@
+mod blur;
 mod command;
 mod effect;
 mod shape;
@@ -5,6 +6,7 @@ mod text;
 
 use super::{Area, Corners, Transform};
 
+pub use blur::BlurArea;
 pub use command::Command;
 pub use effect::VALUE_ROWS;
 
@@ -14,6 +16,10 @@ pub use effect::VALUE_ROWS;
  */
 pub struct Renderer {
     commands: Vec<Command>,
+
+    // what the compositor blurs behind the window, which no command can draw
+    blurs: Vec<BlurArea>,
+
     transform: Transform,
 }
 
@@ -27,6 +33,7 @@ impl Renderer {
 
         Self {
             commands: Vec::new(),
+            blurs: Vec::new(),
             transform,
         }
     }
@@ -38,6 +45,7 @@ impl Renderer {
     pub fn group(&self) -> Self {
         Self {
             commands: Vec::new(),
+            blurs: Vec::new(),
             transform: self.transform,
         }
     }
@@ -47,6 +55,8 @@ impl Renderer {
         if opacity <= 0.0 {
             return;
         }
+
+        self.blurs.extend(group.blurs);
 
         let cuts = group
             .commands
@@ -71,6 +81,17 @@ impl Renderer {
         // an empty rectangle shows none of the group
         if area.width <= 0.0 || area.height <= 0.0 {
             return;
+        }
+
+        // the compositor blurs what is behind the window, so a clip can only trim the region
+        let bounds = blur::device_shape(self.transform, area, radius).area;
+
+        for mut blurred in group.blurs {
+            blurred.area = blurred.area.intersect(bounds);
+
+            if blurred.area.width > 0.0 && blurred.area.height > 0.0 {
+                self.blurs.push(blurred);
+            }
         }
 
         self.commands.push(Command::Clip {
