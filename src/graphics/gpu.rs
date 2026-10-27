@@ -1,5 +1,4 @@
 mod atlas;
-mod blur;
 mod clip;
 mod convert;
 mod cut;
@@ -100,7 +99,6 @@ pub struct Gpu {
 
     composite: Pass,
     present: Pass,
-    box_blur: Pass,
     erase: Pass,
 }
 
@@ -126,7 +124,6 @@ impl Gpu {
 
         let composite = Pass::new(&device, "composite", TextureFormat::Rgba8Unorm, over);
         let present = Pass::new(&device, "composite", config.format, None);
-        let box_blur = Pass::new(&device, "box_blur", TextureFormat::Rgba8Unorm, None);
         let erase = cut::erase(&device);
 
         let quads = quads::Quads::new(&device, &queue);
@@ -158,7 +155,6 @@ impl Gpu {
 
             composite,
             present,
-            box_blur,
             erase,
         }
     }
