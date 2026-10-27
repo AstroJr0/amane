@@ -21,7 +21,7 @@ pub struct Rectangle {
     pub(crate) corners: Option<[Radius; 4]>,
     pub(crate) border_thickness: f32,
     pub(crate) border_color: Color,
-    pub(crate) blur: f32,
+    pub(crate) blur: bool,
     pub(crate) opacity: f32,
     pub(crate) shadow: Option<Shadow>,
     pub(crate) shader: Option<PathBuf>,
@@ -105,8 +105,9 @@ impl Rectangle {
         self
     }
 
-    pub fn blur(mut self, amount: f32) -> Self {
-        self.blur = amount;
+    // the compositor blurs what is behind the window inside this shape, see the Rectangle docs
+    pub fn blur(mut self) -> Self {
+        self.blur = true;
 
         self
     }
@@ -195,7 +196,7 @@ impl RectangleNeedsHeight {
             fill: Fill::Color(Color::TRANSPARENT),
             border_thickness: 0.0,
             border_color: Color::TRANSPARENT,
-            blur: 0.0,
+            blur: false,
             opacity: 1.0,
             shadow: None,
             shader: None,
@@ -247,4 +248,4 @@ mod tests {
             .radius(Full)
             .radius_top_left(4.0);
     }
-}
+}  
