@@ -1,6 +1,6 @@
 use vello::Scene;
 use vello::kurbo::Affine;
-use vello::peniko::{Fill, ImageData, Mix};
+use vello::peniko::{Fill, Mix};
 use vello::wgpu::Texture;
 
 use crate::graphics::renderer::Command;
@@ -24,12 +24,9 @@ impl Gpu {
     fn run_clipped(&mut self, commands: Vec<Command>, canvas: &Texture, clips: Clips) {
         let mut scene = Scene::new();
 
-        // blurred copies vello reads from, dropped once the scene using them is drawn
-        let mut borrowed = Vec::new();
+        self.gather(commands, canvas, clips, &mut scene);
 
-        self.gather(commands, canvas, clips, &mut scene, &mut borrowed);
-
-        self.flush(&mut scene, canvas, &mut borrowed);
+        self.flush(&mut scene, canvas);
     }
 
     fn gather(
@@ -38,18 +35,17 @@ impl Gpu {
         canvas: &Texture,
         clips: Clips,
         scene: &mut Scene,
-        borrowed: &mut Vec<ImageData>,
     ) {
         for command in commands {
             match route(&command) {
                 Route::Canvas => {
-                    self.flush(scene, canvas, borrowed);
+                    self.flush(scene, canvas);
 
-                    self.change_canvas(command, canvas, scene, borrowed);
+                    self.change_canvas(command, canvas);
                 }
 
                 Route::OwnCanvas => {
-                    self.flush(scene, canvas, borrowed);
+                    self.flush(scene, canvas);
 
                     self.draw_on_own_canvas(command, canvas, clips);
                 }
@@ -59,11 +55,11 @@ impl Gpu {
                         unreachable!("only clips are routed as quad clips");
                     };
 
-                    self.gather(commands, canvas, clips.within(clip), scene, borrowed);
+                    self.gather(commands, canvas, clips.within(clip), scene);
                 }
 
                 Route::Quads => {
-                    self.paint_pending_vello(scene, canvas, borrowed);
+                    self.paint_pending_vello(scene, canvas);
 
                     self.add_to_quads(command, clips);
                 }
@@ -73,25 +69,9 @@ impl Gpu {
         }
     }
 
-    // runs a blur, cut or shader on what the canvas holds so far
-    fn change_canvas(
-        &mut self,
-        command: Command,
-        canvas: &Texture,
-        scene: &mut Scene,
-        borrowed: &mut Vec<ImageData>,
-    ) {
+    // runs a cut or shader on what the canvas holds so far
+    fn change_canvas(&mut self, command: Command, canvas: &Texture) {
         match command {
-            Command::Blur {
-                path,
-                transform,
-                amount,
-            } => {
-                let blurred = self.blur(canvas, scene, &path, transform, amount);
-
-                borrowed.extend(blurred);
-            }
-
             Command::Cut {
                 area,
                 radius,
@@ -118,14 +98,14 @@ impl Gpu {
                 transform,
             } => self.shade(canvas, &shader, &values, area, path.as_ref(), transform),
 
-            _ => unreachable!("only blurs, cuts and shaders change the canvas"),
+            _ => unreachable!("only cuts and shaders change the canvas"),
         }
     }
 
     /*
      * a faded group is drawn on its own canvas and laid down faded as one, so
      * where its parts overlap they don't show through each other; a clip holding
-     * a blur, cut or shader is drawn apart too, so those only see the clip's drawing
+     * a cut or shader is drawn apart too, so those only see the clip's drawing
      */
     fn draw_on_own_canvas(&mut self, command: Command, canvas: &Texture, clips: Clips) {
         let (commands, opacity, clipped_to) = match command {
@@ -235,14 +215,9 @@ impl Gpu {
     }
 
     // vello's drawing so far goes down first, so the quads land on top of it
-    fn paint_pending_vello(
-        &mut self,
-        scene: &mut Scene,
-        canvas: &Texture,
-        borrowed: &mut Vec<ImageData>,
-    ) {
+    fn paint_pending_vello(&mut self, scene: &mut Scene, canvas: &Texture) {
         if !scene.encoding().is_empty() {
-            self.paint(scene, canvas, borrowed);
+            self.paint(scene, canvas);
         }
     }
 
@@ -284,10 +259,10 @@ impl Gpu {
         }
     }
 
-    fn flush(&mut self, scene: &mut Scene, canvas: &Texture, borrowed: &mut Vec<ImageData>) {
+    fn flush(&mut self, scene: &mut Scene, canvas: &Texture) {
         self.draw_quads(canvas);
 
-        self.paint(scene, canvas, borrowed);
+        self.paint(scene, canvas);
     }
 
     // the quads gathered so far, written onto the frame's encoder
@@ -302,10 +277,10 @@ impl Gpu {
 
 // where a command is drawn, decided before anything is drawn
 enum Route {
-    // blurs, cuts and shaders work on what the canvas already holds
+    // cuts and shaders work on what the canvas already holds
     Canvas,
 
-    // a faded group, or a clip holding a blur, cut or shader
+    // a faded group, or a clip holding a cut or shader
     OwnCanvas,
 
     // a clip the quads apply themselves, its commands routed like any others
@@ -320,7 +295,7 @@ enum Route {
 
 fn route(command: &Command) -> Route {
     match command {
-        Command::Blur { .. } | Command::Cut { .. } | Command::Shader { .. } => Route::Canvas,
+        Command::Cut { .. } | Command::Shader { .. } => Route::Canvas,
 
         Command::Group { .. } => Route::OwnCanvas,
 
@@ -368,10 +343,10 @@ fn route(command: &Command) -> Route {
     }
 }
 
-// blurs, cuts and shaders work on the canvas itself, so a clip holding one draws on a canvas of its own
+// cuts and shaders work on the canvas itself, so a clip holding one draws on a canvas of its own
 fn needs_own_canvas(commands: &[Command]) -> bool {
     commands.iter().any(|command| match command {
-        Command::Blur { .. } | Command::Cut { .. } | Command::Shader { .. } => true,
+        Command::Cut { .. } | Command::Shader { .. } => true,
         Command::Group { commands, .. } | Command::Clip { commands, .. } => {
             needs_own_canvas(commands)
         }
