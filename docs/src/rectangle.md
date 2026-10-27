@@ -69,12 +69,14 @@ Each stop is a position from 0 to 1 and a color. A linear gradient also takes an
 .opacity(0.5)
 .shadow(Shadow::drop("#000000").opacity(0.3).blur(12.0).offset(0.0, 4.0))
 .shadow(Shadow::inner("#000000").opacity(0.3).blur(8.0))
-.blur(20.0)
+.blur()
 ```
 
 - `opacity` fades the rectangle **and everything inside it**, from 0 (invisible) to 1.
 - `Shadow::drop` casts a shadow behind the rectangle. `Shadow::inner` shades along the inside edge, as if it were pressed in. `blur` softens it, and `offset` moves it.
-- `blur` blurs whatever was drawn behind the rectangle, inside its shape, for a frosted-glass look. It can only blur what your own window drew underneath. It can't see other apps' windows.
+- `blur` asks the compositor to blur whatever is behind the window, inside the rectangle's shape, for a frosted-glass look. Amane draws nothing for it, so the rectangle's fill has to be see-through (a low alpha like `#1e1e2e99`) for the blur to show. It blurs other apps' windows and the wallpaper, not what your own window drew underneath. How strong the blur is, is up to the compositor.
+
+  This needs a compositor with the `ext-background-effect-v1` protocol (KWin, Mutter and niri at the time of writing). Everywhere else `blur` does nothing and the rectangle is drawn as it is. The region is made of rectangles, so a rounded corner is a staircase of one-pixel rows. A rotated rectangle blurs its bounding box.
 
 ## Masks
 
