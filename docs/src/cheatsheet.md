@@ -281,4 +281,4 @@ use amane::*;
 | `amane clean --yes` | the same, without asking |
 | `amane ipc call <name> [args...]` | calls an IPC handler |
 | `AMANE_FRAMES=1` | prints a line per frame, for finding slow or endless redraws |
-| `amane update` | updates amane (plz check the [warning](./installation.md#updating) for NixOS)|
+| `amane update` | pulls your amane clone and reinstalls the command. NixOS: see [Updating](installation.md#updating) |
