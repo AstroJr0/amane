@@ -12,7 +12,7 @@ To try it without installing:
 nix run github:MystiaFin/amane -- new
 ```
 
-To install it for your user:
+To install it for the user, run:
 
 ```sh
 nix profile install github:MystiaFin/amane
@@ -61,7 +61,7 @@ You need a Rust toolchain, `pkg-config`, and these libraries with their developm
 | PulseAudio client | `libpulse-dev` | `libpulse` |
 | PAM | `libpam0g-dev` | `pam` |
 
-Then build and install the command:
+Then build and install it:
 
 ```sh
 git clone https://github.com/MystiaFin/amane
@@ -75,21 +75,16 @@ The `amane` command runs `cargo` every time it builds your shell, so keep the Ru
 
 ## Updating
 
-The library is copied into the `amane` command when built. You can update your setup seamlessly using the built-in command:
+The library is copied into the `amane` command when the command is built, so update the command itself:
 
 ```sh
 amane update
 ```
 
->[!WARNING]
-> `amane update` *does* work on NixOS, but it executes `nix profile upgrade amane` in the background.
-> If amane was installed **System-Wide via Nix Flakes**, DO NOT confirm the confirmation prompt
-> as packages must be updated through your flake configuration instead.
+It fetches your clone, asks before pulling (fast-forward only), then reinstalls the command. See [The amane Command](cli.md).
 
-For manual updates:
-- NixOS (Profile): `nix profile upgrade amane`
-- Other Distributions: `git pull` in the clone, then run `cargo install --path cli` again.
+- NixOS (profile): `amane update` runs `nix profile upgrade amane`.
+- NixOS (system-wide flake): don't confirm that prompt. Update the flake input and rebuild.
+- Manual Installation: `git pull` inside the clone, then run `cargo install --path cli` again.
 
-The next `amane compile` or `amane dev` will automatically rebuild your shell with the new library and features!
-
-
+The next `amane compile` or `amane dev` rebuilds your shell with the new library.
