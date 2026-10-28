@@ -154,8 +154,10 @@ amane update
 ```
 
 > [!WARNING]
-> If amane was installed through Nix, `amane update` run `nix profile upgrade amane`.
+> For NixOS:
+> `amane update` runs `nix profile upgrade amane`.
 > If you installed it **system-wide through a flake**, say no. Update the flake input instead.
+> Else, you are good to go
 
 ## Example
 
