@@ -76,8 +76,8 @@ fn usage() -> ExitCode {
     eprintln!("  amane new [folder]                   create a shell, in ~/.config/amane by default");
     eprintln!("  amane new [folder] --example         create a full example bar instead");
     eprintln!("  amane target [folder]                show or set the folder your shell lives in");
-    eprintln!("  amane update [folder]                pull the repository and rebuild the amane command");
-    eprintln!("  amane dev                           rebuild and restart on every save");
+    eprintln!("  amane update [folder]                pull the latest clone and reinstall amane");
+    eprintln!("  amane dev                            rebuild and restart on every save");
     eprintln!("  amane compile                        build the optimised shell");
     eprintln!("  amane compile --restart              build it, then restart the running shell");
     eprintln!("  amane run                            start the compiled shell");
