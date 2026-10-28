@@ -1,86 +1,92 @@
-# Installation
+# The amane Command
 
-Amane comes as one command, `amane`. The command carries a full copy of the library inside it. It builds your shell from your config folder, so you never set up a Cargo project yourself.
+| Command | What it does |
+|---|---|
+| `amane new` | Asks where your shell should go (defaults to `~/.config/amane`), then creates `src/main.rs` there from a template, plus a `Cargo.toml` for your editor. Never overwrites an existing shell file. |
+| `amane new <folder>` | Same, but inside `<folder>`. Amane remembers the folder, like `amane target`. |
+| `amane new [folder] --example` | Creates a full example bar instead, split over several files, with workspace buttons for each monitor. Never overwrites an existing file. |
+| `amane target <folder>` | Points Amane at a shell that already exists inside `<folder>`, for example after moving it or cloning your dotfiles. The folder needs a `src/main.rs`. |
+| `amane target` | Prints the folder path Amane builds your shell from. |
+| `amane dev` | Builds your shell, starts it, and rebuilds and restarts it on every save. |
+| `amane compile` | Builds your shell and saves it as `~/.cache/amane/amane-shell`, without starting it. |
+| `amane compile --restart` | Same as `amane compile`, then restarts the running shell with the new build, like `amane restart`. Restarts nothing if the build fails. |
+| `amane run` | Starts the shell `amane compile` had saved in the background and runs the shell as a daemon. Never builds. Stops with an error msg if a shell is already running. |
+| `amane restart` | Stops the shell `amane run` started, then starts the one `amane compile` had saved. Starts it anyway if none was running. Leaves the shell from `amane dev` alone. |
+| `amane update [folder]` | Fetches your **amane clone**, **asks** then **pulls** it *(fast-forward only)* and reinstalls the command. Finds the clone from `AMANE_REPO`, or `~/amane`; a `folder` is remembered later. On a Nix installation it runs `nix profile upgrade amane` instead. |
+| `amane clean` | Deletes the build output in `~/.cache/amane/project/`. Keeps the compiled shell, so `amane run` still works. Asks before deleting. |
+| `amane clean --yes` | Same as `amane clean`, without asking first. |
+| `amane ipc call <name> [arguments...]` | Calls a handler in the running shell. See [IPC](ipc.md). |
 
-## NixOS
+## Where things live
 
-The repository is a flake. Its package wraps `amane` with everything it needs at build time (cargo, rustc, pkg-config, and the system libraries), so there's nothing else to install.
+- **Your shell:** `~/.config/amane/src/`, or the `<folder>` you gave to `amane new` or `amane target`. `main.rs` is the entry point. You can add more files next to it and load them with `mod`, like in any other Rust program.
+- **Which folder:** `amane target` prints it. A folder other than the default is saved in `~/.local/state/amane/config-path`, done per machine, so it stays out of your dotfiles. Run `amane target` again on each new machine.
+- **Cargo.toml:** next to your `src/`. `amane new` writes it, and rust-analyzer reads it to find Amane in any editor. Every build rewrites the `amane` line in `[dependencies]` with this machine's path, so leave that line alone. Everything else is yours, see [Dependencies](#dependencies). If you keep your shell in git, that line changes per machine, so you may prefer to ignore `Cargo.toml`, `Cargo.lock` and `target/`.
+- **Build files:** `~/.cache/amane/`.
+  - `library/` holds the copy of Amane unpacked from the command.
+  - `project/` holds the Cargo project generated around your `main.rs`.
+  - `project/target/` holds the build output.
+  - `amane-shell` is the shell `amane compile` saved, which `amane run` starts.
 
-To try it without installing:
+These paths follow `XDG_CONFIG_HOME`, `XDG_STATE_HOME` and `XDG_CACHE_HOME` when they're set.
+
+You never edit anything in the cache folder. Deleting it is safe. The next build makes it again from scratch.
+
+`project/` is the big one, often close to **1 GB**. It only makes rebuilds fast, and your shell never reads it. Run `amane clean` to delete it. It asks first, because the next `amane compile` or `amane dev` then builds everything again from scratch, which takes a few minutes. To build and shrink in one go without the question:
 
 ```sh
-nix run github:MystiaFin/amane -- new
+amane compile && amane clean --yes
 ```
 
-To install it for your user:
+## Splitting your shell into files
 
-```sh
-nix profile install github:MystiaFin/amane
+`main.rs` can load other files the usual Rust way:
+
+```text
+~/.config/amane/src/
+├── main.rs
+├── bar.rs
+└── clock.rs
 ```
 
-To install it system-wide, add it to your flake inputs:
+```rust,ignore
+// main.rs
+mod bar;
+mod clock;
 
-```nix
-{
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    amane = {
-      url = "github:MystiaFin/amane";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-  };
+use amane::App;
 
-  outputs = { nixpkgs, amane, ... }: {
-    nixosConfigurations.your-host = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
-      modules = [
-        ./configuration.nix
-        {
-          environment.systemPackages = [ amane.packages.x86_64-linux.default ];
-        }
-      ];
-    };
-  };
+fn main() {
+    App::new().window(bar::view).run();
 }
 ```
 
-Replace `your-host` with your host's name, then rebuild.
+`amane dev` watches the whole `src/` folder, plus `Cargo.toml` and `Cargo.lock`, so saving any of these files triggers a rebuild.
 
-The `follows` line builds Amane with your system's nixpkgs, so it uses the same glibc as your graphics driver. Without it, the shell can fail to find your GPU.
+## How your shell is built
 
-## Other distributions
+`amane dev` and `amane compile` share one build, so the build output is only kept on disk once.
 
-You need a Rust toolchain, `pkg-config`, and these libraries with their development headers:
+| | Optimized |
+|---|---|
+| Your code | no, so a save rebuilds in seconds |
+| Amane and its dependencies | yes |
 
-| Library | Debian / Ubuntu | Arch |
-|---|---|---|
-| Wayland | `libwayland-dev` | `wayland` |
-| xkbcommon | `libxkbcommon-dev` | `libxkbcommon` |
-| fontconfig | `libfontconfig1-dev` | `fontconfig` |
-| Vulkan loader | `libvulkan1` | `vulkan-icd-loader` |
-| PulseAudio client | `libpulse-dev` | `libpulse` |
-| PAM | `libpam0g-dev` | `pam` |
+Amane is always optimized, because unoptimized drawing is too slow for smooth animation. Your own code only describes the shell and Amane does the heavy work, so leaving your code unoptimized keeps rebuilds quick without slowing the shell down.
 
-Then build and install the command:
+## Dependencies
 
-```sh
-git clone https://github.com/MystiaFin/amane
-cd amane
-cargo install --path cli
+Add crates under `[dependencies]` in the `Cargo.toml` next to your `src/`, like in any Rust project:
+
+```toml
+[dependencies]
+chrono = "0.4"
 ```
 
-`cargo install` puts `amane` in `~/.cargo/bin`. Make sure that folder is on your `PATH`.
+The next `amane compile` or `amane dev` fetches and builds them. A relative `path = "..."` is read from your shell folder. After every good build, the resolved `Cargo.lock` is copied back next to your `Cargo.toml` when one exists there, so your versions stay pinned.
 
-The `amane` command runs `cargo` every time it builds your shell, so keep the Rust toolchain installed.
+Most of what a shell needs is in the library already, so reach for a crate only when it isn't:
 
-## Updating
-
-The library is copied into the `amane` command when the command is built. To get a newer Amane, run:
-
-```sh
-amane update
-```
-
-On NixOS, `amane update` will prompt you to run `nix profile upgrade amane`. You can also run it directly, or update the flake input and rebuild.
-
-The next `amane compile` or `amane dev` rebuilds your shell with the new library.
+- system data, through [Built-in Services](system.md)
+- running commands and reading their output, through [Commands and Files](processes.md)
+- file watching, D-Bus, and IPC
