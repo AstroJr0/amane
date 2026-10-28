@@ -1,6 +1,6 @@
 # Workspaces
 
-`Workspaces` lists your compositor's workspaces and can switch between them. It supports **niri**, **Hyprland**, **Sway** and **Mango (MangoWC)**. On other compositors, the list stays empty.
+`Workspaces` lists your compositor's workspaces and can switch between them. It supports **niri**, **Hyprland**, **Sway**, **Mango (MangoWC)** and **Umbriel**. On other compositors, the list stays empty.
 
 It doesn't poll. It follows the compositor's event stream, so the bar updates the moment you switch.
 
