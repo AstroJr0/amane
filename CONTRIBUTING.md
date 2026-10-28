@@ -30,7 +30,7 @@ If yours does, Amane already runs there.
 GNOME doesn't support it.
 
 Compositor-specific services, like workspaces, need code for each compositor's own IPC.
-Right now that's niri, Hyprland, Sway and Mango (`src/compositor/`).
+Right now that's niri, Hyprland, Sway, Mango and Umbriel (`src/compositor/`).
 For these, say which service you need and link the compositor's IPC documentation.
 
 ## Pull requests
