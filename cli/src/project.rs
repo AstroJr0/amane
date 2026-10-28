@@ -1,6 +1,7 @@
 use std::collections::hash_map::DefaultHasher;
 use std::fs;
 use std::hash::{Hash, Hasher};
+use std::io;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
@@ -29,21 +30,16 @@ pub fn prepare() -> Option<PathBuf> {
 
     let config_manifest_path = config.join("Cargo.toml");
 
-    let contents = if config_manifest_path.exists() {
-        match fs::read_to_string(&config_manifest_path) {
-            Ok(contents) => contents,
-            Err(err) => {
-                eprintln!("failed to read {}: {err}", config_manifest_path.display());
+    let contents = match fs::read_to_string(&config_manifest_path) {
+        Ok(contents) => contents,
 
-                return None;
-            }
+        Err(err) if err.kind() == io::ErrorKind::NotFound => default_manifest(&library_path),
+
+        Err(err) => {
+            eprintln!("failed to read {}: {err}", config_manifest_path.display());
+
+            return None;
         }
-    } else {
-        let initial = default_manifest(&library_path);
-
-        write_if_changed(&config_manifest_path, initial.as_bytes());
-
-        initial
     };
 
     let mut user_doc: toml_edit::DocumentMut = match contents.parse() {
@@ -56,15 +52,11 @@ pub fn prepare() -> Option<PathBuf> {
     };
 
     // rust-analyzer only finds amane through a Cargo.toml next to the user's src
-    if user_doc.get("dependencies").is_none() {
-        user_doc["dependencies"] = toml_edit::Item::Table(toml_edit::Table::new());
-    }
+    set_amane_dependency(&mut user_doc, &library_path);
 
-    ensure_amane_dependency(&mut user_doc["dependencies"], &library_path);
-
-    if user_doc.get("workspace").is_none() {
-        user_doc["workspace"] = toml_edit::Item::Table(toml_edit::Table::new());
-    }
+    user_doc
+        .entry("workspace")
+        .or_insert(toml_edit::Item::Table(toml_edit::Table::new()));
 
     write_if_changed(&config_manifest_path, user_doc.to_string().as_bytes());
 
@@ -80,21 +72,17 @@ pub fn prepare() -> Option<PathBuf> {
 
     let lock_changed = clean_if_dependencies_changed(&lock, &project_folder);
 
-    let config_lock = config.join("Cargo.lock");
     let project_lock = project_folder.join("Cargo.lock");
 
-    if lock_changed || !project_lock.exists() {
-        if config_lock.exists() {
-            let user_lock = fs::read(&config_lock).expect("failed to read user lock");
+    // the user's lock wins, so their crates keep the versions they were built with
+    match fs::read(config.join("Cargo.lock")) {
+        Ok(user_lock) => write_if_changed(&project_lock, &user_lock),
 
-            write_if_changed(&project_lock, &user_lock);
-        } else {
+        Err(_) if lock_changed || !project_lock.exists() => {
             write_if_changed(&project_lock, &lock);
         }
-    } else if config_lock.exists() {
-        let user_lock = fs::read(&config_lock).expect("failed to read user lock");
 
-        write_if_changed(&project_lock, &user_lock);
+        Err(_) => {}
     }
 
     rebuild_if_swapped(&config, &source, &main, &project_folder);
@@ -215,7 +203,7 @@ edition = \"2024\"
 
 [dependencies]
 amane = {{ path = '{library}' }}
-# add extra crates for your shell here, for example:
+# you can also add extra crates, for example:
 # chrono = \"0.4\"
 
 [profile.dev]
@@ -239,9 +227,8 @@ fn build_project_manifest(
 ) -> toml_edit::DocumentMut {
     let mut doc = user_doc.clone();
 
-    if doc.get("package").is_none() {
-        doc["package"] = toml_edit::Item::Table(toml_edit::Table::new());
-    }
+    doc.entry("package")
+        .or_insert(toml_edit::Item::Table(toml_edit::Table::new()));
 
     doc["package"]["name"] = toml_edit::value(BINARY);
     doc["package"]["edition"] = toml_edit::value("2024");
@@ -260,13 +247,9 @@ fn build_project_manifest(
     bin_array.push(bin_table);
     doc["bin"] = toml_edit::Item::ArrayOfTables(bin_array);
 
-    if doc.get("dependencies").is_none() {
-        doc["dependencies"] = toml_edit::Item::Table(toml_edit::Table::new());
-    }
+    set_amane_dependency(&mut doc, library_path);
 
-    ensure_amane_dependency(&mut doc["dependencies"], library_path);
-
-    make_paths_absolute(&mut doc.as_item_mut(), config);
+    make_paths_absolute(doc.as_item_mut(), config);
 
     ensure_profiles(&mut doc);
 
@@ -275,31 +258,21 @@ fn build_project_manifest(
     doc
 }
 
-fn ensure_amane_dependency(dependencies: &mut toml_edit::Item, library_path: &str) {
+// amane always comes from the unpacked library, whatever the user's manifest says
+fn set_amane_dependency(doc: &mut toml_edit::DocumentMut, library_path: &str) {
+    let mut amane = toml_edit::InlineTable::new();
+
+    amane.insert("path", library_path.into());
+
+    let dependencies = doc
+        .entry("dependencies")
+        .or_insert(toml_edit::Item::Table(toml_edit::Table::new()));
+
     if let Some(table) = dependencies.as_table_like_mut() {
-        if let Some(amane) = table.get_mut("amane") {
-            if let Some(inline) = amane.as_inline_table_mut() {
-                inline.insert("path", library_path.into());
-            } else if let Some(tab) = amane.as_table_mut() {
-                tab.insert("path", toml_edit::value(library_path));
-            } else {
-                let mut inline = toml_edit::InlineTable::new();
-                inline.insert("path", library_path.into());
-
-                table.insert(
-                    "amane",
-                    toml_edit::Item::Value(toml_edit::Value::InlineTable(inline)),
-                );
-            }
-        } else {
-            let mut inline = toml_edit::InlineTable::new();
-            inline.insert("path", library_path.into());
-
-            table.insert(
-                "amane",
-                toml_edit::Item::Value(toml_edit::Value::InlineTable(inline)),
-            );
-        }
+        table.insert(
+            "amane",
+            toml_edit::Item::Value(toml_edit::Value::InlineTable(amane)),
+        );
     }
 }
 
@@ -322,52 +295,42 @@ fn resolve_relative(base: &Path, rel: &Path) -> PathBuf {
     result
 }
 
+// every relative `path` in the manifest is read from the shell folder, not from the generated project
 fn make_paths_absolute(item: &mut toml_edit::Item, base_dir: &Path) {
-    match item {
-        toml_edit::Item::Table(table) => {
-            if let Some(path_item) = table.get_mut("path") {
-                if let Some(path_val) = path_item.as_value_mut() {
-                    if let Some(rel) = path_val.as_str() {
-                        let path = Path::new(rel);
-
-                        if path.is_relative() {
-                            let abs = resolve_relative(base_dir, path);
-
-                            *path_val = abs.display().to_string().into();
-                        }
-                    }
-                }
-            }
-
-            for (_, value) in table.iter_mut() {
-                make_paths_absolute(value, base_dir);
+    if let Some(array) = item.as_array_of_tables_mut() {
+        for table in array.iter_mut() {
+            for (_, child) in table.iter_mut() {
+                make_paths_absolute(child, base_dir);
             }
         }
 
-        toml_edit::Item::Value(toml_edit::Value::InlineTable(table)) => {
-            if let Some(path_val) = table.get_mut("path") {
-                if let Some(rel) = path_val.as_str() {
-                    let path = Path::new(rel);
-
-                    if path.is_relative() {
-                        let abs = resolve_relative(base_dir, path);
-
-                        *path_val = abs.display().to_string().into();
-                    }
-                }
-            }
-        }
-
-        toml_edit::Item::ArrayOfTables(array) => {
-            for table in array.iter_mut() {
-                for (_, value) in table.iter_mut() {
-                    make_paths_absolute(value, base_dir);
-                }
-            }
-        }
-
-        _ => {}
+        return;
     }
+
+    let Some(table) = item.as_table_like_mut() else {
+        return;
+    };
+
+    if let Some(path) = table
+        .get_mut("path")
+        .and_then(toml_edit::Item::as_value_mut)
+    {
+        make_absolute(path, base_dir);
+    }
+
+    for (_, child) in table.iter_mut() {
+        make_paths_absolute(child, base_dir);
+    }
+}
+
+fn make_absolute(value: &mut toml_edit::Value, base_dir: &Path) {
+    let Some(relative) = value.as_str().filter(|path| Path::new(path).is_relative()) else {
+        return;
+    };
+
+    let absolute = resolve_relative(base_dir, Path::new(relative));
+
+    *value = absolute.display().to_string().into();
 }
 
 fn ensure_profiles(doc: &mut toml_edit::DocumentMut) {
@@ -407,9 +370,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_ensure_amane_dependency_preserves_crates() {
+    fn the_amane_dependency_keeps_other_crates() {
         let manifest = r#"[package]
-name = "my-shell"
+name = "my-awesome-shell"
 version = "0.1.0"
 edition = "2024"
 
@@ -419,7 +382,7 @@ serde = { version = "1.0", features = ["derive"] }
 "#;
 
         let mut doc: toml_edit::DocumentMut = manifest.parse().unwrap();
-        ensure_amane_dependency(&mut doc["dependencies"], "/path/to/library");
+        set_amane_dependency(&mut doc, "/path/to/library");
 
         let output = doc.to_string();
         assert!(output.contains(r#"chrono = "0.4""#));
@@ -428,14 +391,14 @@ serde = { version = "1.0", features = ["derive"] }
     }
 
     #[test]
-    fn test_ensure_amane_dependency_updates_path() {
+    fn the_amane_dependency_path_is_replaced() {
         let manifest = r#"[dependencies]
 amane = { path = "/old/path/to/library" }
 chrono = "0.4"
 "#;
 
         let mut doc: toml_edit::DocumentMut = manifest.parse().unwrap();
-        ensure_amane_dependency(&mut doc["dependencies"], "/new/path/to/library");
+        set_amane_dependency(&mut doc, "/new/path/to/library");
 
         let output = doc.to_string();
         assert!(output.contains(r#"amane = { path = "/new/path/to/library" }"#));
@@ -446,7 +409,7 @@ chrono = "0.4"
     #[test]
     fn test_build_project_manifest_resolves_relative_paths() {
         let manifest = r#"[package]
-name = "custom-shell"
+name = "my-custom-shell"
 version = "0.2.0"
 edition = "2024"
 
@@ -483,19 +446,17 @@ path = "../another_local"
     fn test_comments_and_formatting_preserved() {
         let manifest = r#"# My custom shell configuration
 [package]
-name = "my-shell"
+name = "my-awesome-shell"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-# Standard date/time library
 chrono = "0.4"
-# Serialization
 serde = { version = "1.0", features = ["derive"] }
 "#;
 
         let mut doc: toml_edit::DocumentMut = manifest.parse().unwrap();
-        ensure_amane_dependency(&mut doc["dependencies"], "/cache/library");
+        set_amane_dependency(&mut doc, "/cache/library");
 
         let output = doc.to_string();
         assert!(output.contains("# My custom shell configuration"));
@@ -507,7 +468,7 @@ serde = { version = "1.0", features = ["derive"] }
     #[test]
     fn test_target_dependencies_and_expanded_amane_table() {
         let manifest = r#"[package]
-name = "custom-shell"
+name = "my-custom-shell"
 version = "0.1.0"
 edition = "2024"
 
@@ -520,7 +481,7 @@ local_unix = { path = "./unix_helper" }
 "#;
 
         let mut doc: toml_edit::DocumentMut = manifest.parse().unwrap();
-        ensure_amane_dependency(&mut doc["dependencies"], "/new/library");
+        set_amane_dependency(&mut doc, "/new/library");
 
         let base_dir = Path::new("/home/user/.config/amane");
         let project_doc = build_project_manifest(
@@ -538,7 +499,10 @@ local_unix = { path = "./unix_helper" }
 
     #[test]
     fn test_prepare_flow_with_user_dependencies() {
-        let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_nanos();
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
         let temp_dir = std::env::temp_dir().join(format!("amane_test_{now}"));
         let config_dir = temp_dir.join("config");
         let cache_dir = temp_dir.join("cache");
@@ -557,10 +521,8 @@ local_unix = { path = "./unix_helper" }
         let config_toml = fs::read_to_string(config_dir.join("Cargo.toml")).unwrap();
         assert!(config_toml.contains("amane = { path = "));
 
-        // User adds extra crate
-        let updated_config_toml = format!(
-            "{config_toml}\nchrono = \"0.4\"\n"
-        );
+        // user adds extra crate (test with the chrono crate)
+        let updated_config_toml = format!("{config_toml}\nchrono = \"0.4\"\n");
         fs::write(config_dir.join("Cargo.toml"), updated_config_toml).unwrap();
 
         let _ = prepare().expect("prepare failed on second call");
@@ -570,7 +532,7 @@ local_unix = { path = "./unix_helper" }
         assert!(project_toml.contains("amane = { path = "));
         assert!(project_toml.contains("[profile.dev]"));
 
-        // Clean up
+        // clean up
         unsafe {
             std::env::remove_var("AMANE_CONFIG");
             std::env::remove_var("XDG_CACHE_HOME");
