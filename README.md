@@ -138,7 +138,7 @@ amane restart
 
 ### amane clean
 
-Deletes the build output, which is often close to 1 GB. The compiled shell stays, so `amane run` still works. The next `amane compile` or `amane dev` builds everything again from scratch, so it asks first. `--yes` skips the question.
+Deletes the build output, which is often close to **1 GB**. The compiled shell stays, so `amane run` still works. The next `amane compile` or `amane dev` builds everything again from scratch, so it asks first. `--yes` skips the question.
 
 ```sh
 amane clean
@@ -147,15 +147,15 @@ amane clean --yes
 
 ### amane update
 
-Updates the amane library itself. Works as an alias.
+Pulls the amane clone and reinstalls the `amane` command. It looks for the clone in `AMANE_REPO`, then `~/amane`, or you can name it: `amane update <folder>`.
 
 ```sh
 amane update
 ```
+
 > [!WARNING]
-> `amane update` *does* work on NixOS, but it executes `nix profile upgrade amane` in the background.
-> If amane was installed **System-Wide via Nix Flakes**, DO NOT confirm the confirmation prompt 
-> as packages must be updated through **your flake configuration** instead.
+> If amane was installed through Nix, `amane update` run `nix profile upgrade amane`.
+> If you installed it **system-wide through a flake**, say no. Update the flake input instead.
 
 ## Example
 
@@ -179,7 +179,7 @@ fn view() -> LayerWindow {
                 .width(Parent)
                 .height(Parent)
                 .fill(Color::BLUE)
-                .child(Text::new("hello world!").size(20.0).color(Color::WHITE)),
+                .child(Text::new("hello world").size(20.0).color(Color::WHITE)),
         )
 }
 ```
