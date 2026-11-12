@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request: 
-  # workflow_dispatch:
+  workflow_dispatch:
 
 jobs:
   test:
@@ -16,4 +16,5 @@ jobs:
       - uses: cachix/install-nix-action@v31
 
       # only the library tests, they run without a compositor
+      - run: nix develop -c cargo clippy --all-targets -- -D warnings
       - run: nix develop -c cargo test --lib
