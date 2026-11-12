@@ -59,7 +59,7 @@ impl Shader {
 
         let is_glsl = matches!(extension, Some("glsl" | "frag"));
 
-        device.push_error_scope(ErrorFilter::Validation);
+        let scope = device.push_error_scope(ErrorFilter::Validation);
 
         let vertex = module(device, ShaderSource::Wgsl(Cow::Borrowed(VERTEX)));
 
@@ -93,7 +93,7 @@ impl Shader {
 
         let pipeline = pipeline(device, &inputs, &vertex, &fragment);
 
-        match wait(device.pop_error_scope()) {
+        match wait(scope.pop()) {
             Some(error) => Err(error.to_string()),
             None => Ok(Self { pipeline, inputs }),
         }
