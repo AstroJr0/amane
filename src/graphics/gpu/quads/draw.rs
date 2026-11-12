@@ -32,6 +32,21 @@ impl Quads {
         self.draw_with(device, encoder, canvas, true);
     }
 
+    // erases what lies outside the shape, nothing inside it
+    pub fn trim(
+        &mut self,
+        device: &Device,
+        encoder: &mut CommandEncoder,
+        canvas: &Texture,
+        shape: Clip,
+    ) {
+        let reach = (canvas.width() + canvas.height()) as f32;
+
+        self.outside_mask(shape, reach);
+
+        self.draw_with(device, encoder, canvas, true);
+    }
+
     fn draw_with(
         &mut self,
         device: &Device,

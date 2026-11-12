@@ -10,6 +10,7 @@ use vello::wgpu::{
 };
 use vello::{AaSupport, RendererOptions};
 
+use super::shader;
 use super::target::Display;
 use super::wait::wait;
 
@@ -27,6 +28,9 @@ pub struct Shared {
 
     // how many times vello dropped its image atlas, which every window's images were in
     pub atlas_drops: Rc<Cell<u64>>,
+
+    // custom shaders already compiled, so a second window drawing one doesn't compile it again
+    pub shaders: shader::Cache,
 }
 
 // every window draws on the main thread, so thread locals are enough
@@ -120,5 +124,6 @@ fn open(instance: &Instance, surface: &Surface) -> Shared {
         queue,
         vello: Rc::new(RefCell::new(vello)),
         atlas_drops: Rc::new(Cell::new(0)),
+        shaders: shader::Cache::default(),
     }
 }

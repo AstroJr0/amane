@@ -30,7 +30,6 @@ mod wait;
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::ffi::c_void;
-use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -43,7 +42,6 @@ use vello::wgpu::{
 use crate::graphics::image::Bitmap;
 
 use pass::Pass;
-use shader::Shader;
 use shared::Shared;
 
 // Outlives the backend so cached GPU resources are released after every window.
@@ -85,8 +83,8 @@ pub struct Gpu {
     atlas_drops: Rc<Cell<u64>>,
     atlas_seen: u64,
 
-    // custom shaders, compiled once and kept by the path they were read from
-    shaders: HashMap<PathBuf, Shader>,
+    // custom shaders, compiled once for every window and kept by the path they were read from
+    shaders: shader::Cache,
 
     // finished window-sized textures waiting to be reused
     spare: Vec<Texture>,
@@ -117,6 +115,7 @@ impl Gpu {
             queue,
             vello,
             atlas_drops,
+            shaders,
         } = shared::get(&instance, &surface);
 
         let config = target::configure(&surface, &adapter);
@@ -148,7 +147,7 @@ impl Gpu {
             atlas_drops,
             atlas_seen: 0,
 
-            shaders: HashMap::new(),
+            shaders,
             spare: Vec::new(),
 
             painted: Vec::new(),

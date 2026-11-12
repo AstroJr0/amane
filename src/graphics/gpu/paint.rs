@@ -114,9 +114,9 @@ impl Gpu {
                 shader,
                 values,
                 area,
-                path,
+                radius,
                 transform,
-            } => self.shade(canvas, &shader, &values, area, path.as_ref(), transform),
+            } => self.shade(canvas, &shader, &values, area, radius, transform),
 
             _ => unreachable!("only blurs, cuts and shaders change the canvas"),
         }
@@ -405,7 +405,7 @@ fn device_clip(area: Area, radius: Corners, transform: Transform) -> Option<Clip
     })
 }
 
-fn device_mask(area: Area, radius: Corners, transform: Transform) -> Option<Clip> {
+pub(super) fn device_mask(area: Area, radius: Corners, transform: Transform) -> Option<Clip> {
     let shape = device_clip(area, radius, transform)?;
 
     // subpixel masks need area coverage; distance-based edges would erase too much

@@ -1,14 +1,22 @@
 use std::borrow::Cow;
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 use vello::wgpu::naga::ShaderStage;
 use vello::wgpu::{
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BlendState,
-    BufferBindingType, ColorTargetState, ColorWrites, Device, FragmentState,
+    BufferBindingType, ColorTargetState, ColorWrites, Device, ErrorFilter, FragmentState,
     PipelineLayoutDescriptor, RenderPipeline, RenderPipelineDescriptor, ShaderModule,
     ShaderModuleDescriptor, ShaderSource, ShaderStages, TextureFormat, VertexState,
 };
+
+use super::wait::wait;
+
+// compiled shaders by the path they were read from, one for every window; None is a shader that failed
+pub type Cache = Rc<RefCell<HashMap<PathBuf, Option<Shader>>>>;
 
 // amane's vertex half, which also gives wgsl shaders their inputs
 const VERTEX: &str = include_str!("shader.wgsl");
@@ -32,19 +40,26 @@ layout(set = 0, binding = 3) uniform Values { vec4 values[16]; };
  * size in logical pixels, time in seconds and the rectangle's values (16 is VALUE_ROWS),
  * and returns a plain, not premultiplied, color
  */
+#[derive(Clone)]
 pub struct Shader {
     pub pipeline: RenderPipeline,
     pub inputs: BindGroupLayout,
 }
 
 impl Shader {
-    // .glsl and .frag files are glsl, anything else is wgsl
-    pub fn load(device: &Device, path: &Path) -> Self {
-        let source = fs::read_to_string(path).expect("failed to read shader");
+    /*
+     * .glsl and .frag files are glsl, anything else is wgsl; a file that can't be read or
+     * doesn't compile is an error, since a pipeline that failed to build would fail
+     * every frame it is used in, and take the other drawing of those frames with it
+     */
+    pub fn load(device: &Device, path: &Path) -> Result<Self, String> {
+        let source = fs::read_to_string(path).map_err(|error| error.to_string())?;
 
         let extension = path.extension().and_then(|extension| extension.to_str());
 
         let is_glsl = matches!(extension, Some("glsl" | "frag"));
+
+        device.push_error_scope(ErrorFilter::Validation);
 
         let vertex = module(device, ShaderSource::Wgsl(Cow::Borrowed(VERTEX)));
 
@@ -78,7 +93,10 @@ impl Shader {
 
         let pipeline = pipeline(device, &inputs, &vertex, &fragment);
 
-        Self { pipeline, inputs }
+        match wait(device.pop_error_scope()) {
+            Some(error) => Err(error.to_string()),
+            None => Ok(Self { pipeline, inputs }),
+        }
     }
 }
 

@@ -85,12 +85,12 @@ pub enum Command {
         blur: f32,
     },
 
-    // a custom shader run over the area, trimmed to the path when it has one; values are passed to it
+    // a custom shader run over the area, trimmed to its rounded corners; values are passed to it
     Shader {
         shader: PathBuf,
         values: Vec<[f32; 4]>,
         area: Area,
-        path: Option<BezierPath>,
+        radius: Corners,
         transform: Transform,
     },
 

@@ -36,6 +36,29 @@ impl Quads {
         );
     }
 
+    // everything outside the shape: a border with the shape as its hole, thick enough to reach past the canvas
+    pub(super) fn outside_mask(&mut self, shape: Clip, reach: f32) {
+        let area = Area::new(
+            shape.area.x - reach,
+            shape.area.y - reach,
+            shape.area.width + reach * 2.0,
+            shape.area.height + reach * 2.0,
+        );
+
+        // the hole is the area pulled in by the thickness, so its corners are the shape's own
+        let radius = shape.radius.map(|corner| corner + reach);
+
+        self.push(
+            area,
+            (radius, reach),
+            [1.0; 4],
+            Clips::default(),
+            SHAPE,
+            [0.0; 4],
+            None,
+        );
+    }
+
     pub fn border(
         &mut self,
         area: Area,

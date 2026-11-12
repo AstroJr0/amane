@@ -45,7 +45,7 @@ The GPU runs `main` once for every pixel of the rectangle, all at the same time.
 |---|---|---|
 | `uv` | `vec2<f32>` | where the pixel is, from `(0, 0)` at the top left to `(1, 1)` at the bottom right |
 | `size` | `vec2<f32>` | the rectangle's size in pixels |
-| `time` | `f32` | seconds since the first shader was drawn |
+| `time` | `f32` | seconds since the first shader was drawn, starting over every hour so animations stay smooth in a shell that runs for days |
 | `values` | `array<vec4<f32>, 16>` | numbers you pass from Rust, see [Passing values from Rust](#passing-values-from-rust) |
 
 The color you return is red, green, blue, and alpha, each from 0 to 1.
@@ -116,6 +116,6 @@ Any other extension is read as WGSL.
 ## Limitations
 
 - **The entry point must be called `main`.**
-- **A missing shader file stops the shell.** A shader is loaded when it's first drawn, and if the file can't be read, the shell exits with an error. A shader that doesn't compile doesn't stop the shell. It prints `amane: gpu error: ...` to the terminal instead, and the effect won't draw correctly. Test new shaders with `amane dev`, where you can see that output.
+- **A broken shader draws nothing.** A shader is loaded when it's first drawn. If the file can't be read or doesn't compile, the shell prints `amane: shader <path>: ...` to the terminal once and the rectangle is drawn without it. The shell keeps running, but it won't try that path again until it restarts. Test new shaders with `amane dev`, where you can see that output.
 - **A shader file is read once.** Editing it while the shell runs doesn't change it. `amane dev` doesn't watch shader files either, unless they're inside `src/`, so restart the shell to see changes.
 - Use absolute paths, for the same reason as [images](images.md).

@@ -73,22 +73,15 @@ impl Renderer {
 
     // runs the shader file over the rounded rectangle, handing it the values
     pub fn shader(&mut self, area: Area, shader: &Path, radius: Corners, values: &[[f32; 4]]) {
-        let Some(outline) = area.trace(radius) else {
+        if area.width <= 0.0 || area.height <= 0.0 {
             return;
-        };
-
-        // the shader only covers the area, so square corners need no trimming
-        let path = if radius.largest() > 0.0 {
-            Some(outline)
-        } else {
-            None
-        };
+        }
 
         self.commands.push(Command::Shader {
             shader: shader.to_path_buf(),
             values: values.to_vec(),
             area,
-            path,
+            radius,
             transform: self.transform,
         });
     }
