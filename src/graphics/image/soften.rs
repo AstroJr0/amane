@@ -40,8 +40,8 @@ fn pass(image: &Bitmap, radius: u32, step_x: u32, step_y: u32) -> Vec<u8> {
 
                 let index = ((sample_y * width + sample_x) * 4) as usize;
 
-                for channel in 0..4 {
-                    total[channel] += u32::from(image.pixels[index + channel]);
+                for (sum, &byte) in total.iter_mut().zip(&image.pixels[index..index + 4]) {
+                    *sum += u32::from(byte);
                 }
 
                 count += 1;
@@ -49,8 +49,8 @@ fn pass(image: &Bitmap, radius: u32, step_x: u32, step_y: u32) -> Vec<u8> {
 
             let index = ((y * width + x) * 4) as usize;
 
-            for channel in 0..4 {
-                blurred[index + channel] = (total[channel] / count) as u8;
+            for (pixel, sum) in blurred[index..index + 4].iter_mut().zip(total) {
+                *pixel = (sum / count) as u8;
             }
         }
     }
