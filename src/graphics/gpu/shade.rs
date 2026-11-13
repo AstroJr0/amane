@@ -206,8 +206,10 @@ fn write(bytes: &mut [u8], slot: usize, rows: &[[f32; 4]]) {
 
     let numbers = rows.iter().flatten();
 
-    for (target, number) in slot.chunks_exact_mut(4).zip(numbers) {
-        target.copy_from_slice(&number.to_ne_bytes());
+    let (targets, _) = slot.as_chunks_mut::<4>();
+
+    for (target, number) in targets.iter_mut().zip(numbers) {
+        *target = number.to_ne_bytes();
     }
 }
 
