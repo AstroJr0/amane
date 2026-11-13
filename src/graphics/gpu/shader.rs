@@ -2,7 +2,6 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs;
-use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
@@ -54,10 +53,7 @@ impl Shader {
      * every frame it is used in, and take the other drawing of those frames with it
      */
     pub fn load(device: &Device, path: &Path) -> Result<Self, String> {
-        let source = fs::read_to_string(path).map_err(|error| match error.kind() {
-            ErrorKind::NotFound => "the file doesn't exist".to_owned(),
-            _ => format!("can't be read: {error}"),
-        })?;
+        let source = fs::read_to_string(path).map_err(|error| error.to_string())?;
 
         let extension = path.extension().and_then(|extension| extension.to_str());
 
@@ -98,7 +94,7 @@ impl Shader {
         let pipeline = pipeline(device, &inputs, &vertex, &fragment);
 
         match wait(scope.pop()) {
-            Some(error) => Err(format!("doesn't compile: {error}")),
+            Some(error) => Err(error.to_string()),
             None => Ok(Self { pipeline, inputs }),
         }
     }
