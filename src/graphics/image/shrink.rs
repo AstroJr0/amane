@@ -49,8 +49,8 @@ fn average(image: &Bitmap, left: u32, right: u32, top: u32, bottom: u32) -> [u8;
         for x in left..right {
             let start = ((y * image.width + x) * 4) as usize;
 
-            for channel in 0..4 {
-                total[channel] += u32::from(image.pixels[start + channel]);
+            for (sum, &byte) in total.iter_mut().zip(&image.pixels[start..start + 4]) {
+                *sum += u32::from(byte);
             }
         }
     }
