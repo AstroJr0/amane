@@ -116,6 +116,12 @@ Sway:
 bindsym $mod+space exec amane ipc call toggle-launcher
 ```
 
+Umbriel:
+```toml
+# under [keybinds]
+"Mod+Space" = "spawn amane ipc call toggle-launcher"
+```
+
 ## One shell at a time
 
 There's one IPC socket per session, so only one Amane app can listen for calls at a time. Starting a second listener stops it right away with `failed to listen: amane is already running`. `amane run` checks first and says so in your terminal, and `amane restart` stops the running shell before starting the new one. `amane dev` restarts its own shell without hitting this, but it can't stop a shell started some other way. Stop your everyday shell (the one from `amane run`) before running `amane dev`.
